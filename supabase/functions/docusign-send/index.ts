@@ -281,8 +281,10 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
   } catch (err) {
+    // Return 200 so the Supabase client doesn't swallow the body — error is in the payload
+    console.error("docusign-send error:", String(err))
     return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
   }
 })
