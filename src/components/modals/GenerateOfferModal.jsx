@@ -1,23 +1,22 @@
 import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import { callAI } from '../../lib/supabase'
 
 export default function GenerateOfferModal({ onClose }) {
-  const { candidates, jobs, addOffer } = useApp()
+  const { candidates, jobs, offerTemplates, addOffer, sendOfferViaDocuSign } = useApp()
+
   const [candidateId, setCandidateId] = useState('')
   const [role, setRole] = useState('')
   const [salary, setSalary] = useState('')
   const [startDate, setStartDate] = useState('')
-  const [extras, setExtras] = useState('')
-  const [offerText, setOfferText] = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [managerTitle, setManagerTitle] = useState('')
+  const [commissionAmount, setCommissionAmount] = useState('')
+  const [offerExpiration, setOfferExpiration] = useState('')
+  const [templateId, setTemplateId] = useState(offerTemplates[0]?.id || '')
+  const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
 
-  // Only candidates at Offer or Hired stage
-  const eligibleCandidates = candidates.filter(c =>
-    c.applications?.some(a => a.stage === 'Offer' || a.stage === 'Hired')
-  )
+  const allCandidates = [...candidates].sort((a, b) => `${a.fname} ${a.lname}`.localeCompare(`${b.fname} ${b.lname}`))
+  const selectedCandidate = candidates.find(c => c.id === candidateId)
 
   function onCandidateChange(id) {
     setCandidateId(id)
@@ -26,98 +25,133 @@ export default function GenerateOfferModal({ onClose }) {
     const offerApp = c?.applications?.find(a => a.stage === 'Offer' || a.stage === 'Hired')
     if (offerApp) {
       const job = jobs.find(j => j.id === offerApp.job_id)
-      setRole(job?.title || offerApp.role || '')
+      setRole(job?.title || '')
     }
   }
 
-  async function handleGenerate() {
-    if (!candidateId) { setError('Select a candidate first.'); return }
-    setError('')
-    setAiLoading(true)
-    const c = candidates.find(x => x.id === candidateId)
-    const name = c ? `${c.fname} ${c.lname}` : '[Candidate]'
-    const startStr = startDate
-      ? new Date(startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-      : '[Start Date]'
-    try {
-      const text = await callAI(
-        `Draft a professional job offer letter for ${name} for the ${role || '[Role]'} position. Details: Base salary: ${salary || '[Salary]'}. Start date: ${startStr}. ${extras ? 'Additional compensation/benefits: ' + extras : ''} The letter should be warm but professional, include the key terms, and ask them to confirm acceptance. Sign off from "The People Team". Keep it to 3-4 paragraphs.`
-      )
-      setOfferText(text)
-    } catch (err) {
-      setError('AI generation failed. Make sure the Edge Function is deployed.')
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
-  async function handleSave() {
+  async function handleSend() {
     if (!candidateId) { setError('Select a candidate.'); return }
-    setSaving(true)
+    if (!templateId) { setError('Select a template.'); return }
+    if (!selectedCandidate?.email) { setError('This candidate has no email on file. Add one first.'); return }
+    if (!salary) { setError('Enter a salary amount.'); return }
+
+    setSending(true)
     setError('')
     try {
-      const c = candidates.find(x => x.id === candidateId)
-      const job = jobs.find(j => j.title === role)
-      await addOffer({
+      // 1. Create the offer record
+      const offer = await addOffer({
         candidateId,
-        candidateName: c ? `${c.fname} ${c.lname}` : '',
-        jobId: job?.id || null,
+        candidateName: `${selectedCandidate.fname} ${selectedCandidate.lname}`,
+        jobId: jobs.find(j => j.title === role)?.id || null,
         jobTitle: role,
         salary,
         startDate: startDate || null,
-        letterText: offerText,
+        letterText: '',
       })
+
+      // 2. Send via DocuSign immediately
+      await sendOfferViaDocuSign(offer.id, {
+        signerEmail: selectedCandidate.email,
+        signerName: `${selectedCandidate.fname} ${selectedCandidate.lname}`,
+        templateId,
+        salary,
+        startDate,
+        role,
+        managerTitle,
+        commissionAmount,
+        offerExpiration,
+      })
+
       onClose()
     } catch (err) {
-      setError(err.message)
-      setSaving(false)
+      setError(err.message || 'Something went wrong. Check your DocuSign credentials.')
+      setSending(false)
     }
   }
 
   return (
     <div className="modal-backdrop open" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal" style={{ width: 620 }}>
+      <div className="modal" style={{ width: 580 }}>
         <div className="modal-head">
-          <div><div className="modal-title">Generate offer letter</div><div className="modal-sub">AI-drafted, ready to customize</div></div>
+          <div><div className="modal-title">Send offer letter</div><div className="modal-sub">Fill in the details — we'll send it via DocuSign</div></div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
-          {error && <div style={{ background: 'var(--red-bg)', border: '1px solid #FCA5A5', borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 13, color: 'var(--red-text)', marginBottom: 14 }}>{error}</div>}
-          {eligibleCandidates.length === 0 && (
+          {error && (
+            <div style={{ background: 'var(--red-bg)', border: '1px solid #FCA5A5', borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 13, color: 'var(--red-text)', marginBottom: 14 }}>{error}</div>
+          )}
+          {offerTemplates.length === 0 && (
             <div style={{ background: 'var(--amber-bg)', border: '1px solid #FDE68A', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 13, color: 'var(--amber-text)', marginBottom: 16 }}>
-              No candidates are at Offer or Hired stage yet. Move a candidate to Offer first.
+              No templates uploaded yet. Go to Offers → Templates to upload your Word doc first.
             </div>
           )}
+
+          {/* Candidate + Template */}
           <div className="form-grid">
             <div className="form-row">
-              <label className="form-label">Candidate</label>
+              <label className="form-label">Candidate *</label>
               <select className="form-input" value={candidateId} onChange={e => onCandidateChange(e.target.value)}>
                 <option value="">Select candidate…</option>
-                {eligibleCandidates.map(c => <option key={c.id} value={c.id}>{c.fname} {c.lname}</option>)}
+                {allCandidates.map(c => <option key={c.id} value={c.id}>{c.fname} {c.lname}</option>)}
               </select>
             </div>
-            <div className="form-row"><label className="form-label">Role</label><input className="form-input" value={role} onChange={e => setRole(e.target.value)} placeholder="Senior Engineer" /></div>
+            <div className="form-row">
+              <label className="form-label">Offer template *</label>
+              <select className="form-input" value={templateId} onChange={e => setTemplateId(e.target.value)}>
+                <option value="">Select template…</option>
+                {offerTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Offer details */}
+          <div className="form-grid">
+            <div className="form-row">
+              <label className="form-label">Job title</label>
+              <input className="form-input" value={role} onChange={e => setRole(e.target.value)} placeholder="e.g. Senior Editor" />
+            </div>
+            <div className="form-row">
+              <label className="form-label">Salary amount *</label>
+              <input className="form-input" value={salary} onChange={e => setSalary(e.target.value)} placeholder="e.g. $95,000" />
+            </div>
           </div>
           <div className="form-grid">
-            <div className="form-row"><label className="form-label">Base salary</label><input className="form-input" value={salary} onChange={e => setSalary(e.target.value)} placeholder="$135,000" /></div>
-            <div className="form-row"><label className="form-label">Start date</label><input className="form-input" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></div>
+            <div className="form-row">
+              <label className="form-label">Anticipated start date</label>
+              <input className="form-input" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            </div>
+            <div className="form-row">
+              <label className="form-label">Offer expiration date</label>
+              <input className="form-input" type="date" value={offerExpiration} onChange={e => setOfferExpiration(e.target.value)} />
+            </div>
           </div>
-          <div className="form-row"><label className="form-label">Additional details (bonus, equity, benefits)</label><textarea className="form-input" value={extras} onChange={e => setExtras(e.target.value)} placeholder="e.g. 10% annual bonus, 0.1% equity, unlimited PTO…" /></div>
+          <div className="form-grid">
+            <div className="form-row">
+              <label className="form-label">Manager title</label>
+              <input className="form-input" value={managerTitle} onChange={e => setManagerTitle(e.target.value)} placeholder="e.g. VP of Editorial" />
+            </div>
+            <div className="form-row">
+              <label className="form-label">Commission amount</label>
+              <input className="form-input" value={commissionAmount} onChange={e => setCommissionAmount(e.target.value)} placeholder="e.g. $10,000 or N/A" />
+            </div>
+          </div>
 
-          <button className="btn btn-sm" onClick={handleGenerate} disabled={aiLoading} style={{ marginBottom: 12 }}>
-            {aiLoading ? <span className="ai-loading"><span className="spinner" />Drafting…</span> : '✨ Generate with AI'}
-          </button>
-
-          {offerText && (
-            <div className="ai-panel">
-              <div className="ai-panel-head"><div className="ai-dot" />&nbsp;AI-drafted offer letter</div>
-              <div className="offer-preview">{offerText}</div>
+          {selectedCandidate && (
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 13, marginTop: 4 }}>
+              <span style={{ color: 'var(--text-3)' }}>Sending to: </span>
+              <strong>{selectedCandidate.email || <span style={{ color: 'var(--red-text)' }}>No email on file</span>}</strong>
             </div>
           )}
         </div>
         <div className="modal-footer">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving || !offerText}>{saving ? 'Saving…' : 'Save offer'}</button>
+          <button
+            className="btn btn-primary"
+            onClick={handleSend}
+            disabled={sending || offerTemplates.length === 0}
+          >
+            {sending ? 'Sending…' : 'Send via DocuSign'}
+          </button>
         </div>
       </div>
     </div>
