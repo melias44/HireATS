@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp, avColor, initials, stageStyle, daysAgo, STAGES } from '../../context/AppContext'
-import { callAI } from '../../lib/supabase'
+import { callAI, supabase } from '../../lib/supabase'
 
 export default function CandidateDetailModal({ candidateId, onClose }) {
   const { candidates, jobs, moveStage, addNote, openModal, closeModal } = useApp()
@@ -8,6 +8,12 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
   const [noteRole, setNoteRole] = useState('General')
   const [aiSummary, setAiSummary] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
+  const [resumeUrl, setResumeUrl] = useState(null)
+
+  async function handleDownloadResume(resumePath) {
+    const { data } = await supabase.storage.from('resumes').createSignedUrl(resumePath, 60)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }
 
   const c = candidates.find(x => x.id === candidateId)
   if (!c) return null
@@ -68,10 +74,36 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
               <div className="detail-card">
                 <div className="detail-card-title">Contact info</div>
                 <div className="info-row"><span className="info-key">Email</span><span className="info-val">{c.email || '—'}</span></div>
+                {c.phone && <div className="info-row"><span className="info-key">Phone</span><span className="info-val">{c.phone}</span></div>}
+                {c.location && <div className="info-row"><span className="info-key">Location</span><span className="info-val">{c.location}</span></div>}
+                {c.linkedin && (
+                  <div className="info-row">
+                    <span className="info-key">LinkedIn</span>
+                    <a className="info-val" href={c.linkedin.startsWith('http') ? c.linkedin : `https://${c.linkedin}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>View profile ↗</a>
+                  </div>
+                )}
                 <div className="info-row"><span className="info-key">Source</span><span className="info-val">{c.source}</span></div>
                 <div className="info-row"><span className="info-key">Added</span><span className="info-val">{daysAgo(c.created_at)}</span></div>
                 <div className="info-row"><span className="info-key">Applications</span><span className="info-val">{apps.length}</span></div>
+                {c.resume_path && (
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      className="btn btn-sm"
+                      style={{ width: '100%' }}
+                      onClick={() => handleDownloadResume(c.resume_path)}
+                    >
+                      📄 Download resume ({c.resume_name})
+                    </button>
+                  </div>
+                )}
               </div>
+              {/* Experience summary */}
+              {c.experience && (
+                <div className="detail-card">
+                  <div className="detail-card-title">Experience</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>{c.experience}</div>
+                </div>
+              )}
 
               {/* Applications */}
               <div className="detail-card">

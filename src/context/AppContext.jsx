@@ -113,10 +113,18 @@ export function AppProvider({ children, user }) {
   }, [loadAll])
 
   // ── Mutations ─────────────────────────────────────────────────
-  async function addCandidate({ fname, lname, email, source, role, noteText }) {
+  async function addCandidate({ fname, lname, email, source, role, noteText, phone, linkedin, location, experience, resumePath, resumeName }) {
     const { data: c, error } = await supabase
       .from('candidates')
-      .insert({ fname, lname, email, source, created_by: user.id })
+      .insert({
+        fname, lname, email, source, created_by: user.id,
+        phone: phone || null,
+        linkedin: linkedin || null,
+        location: location || null,
+        experience: experience || null,
+        resume_path: resumePath || null,
+        resume_name: resumeName || null,
+      })
       .select()
       .single()
     if (error) throw error

@@ -10,7 +10,7 @@ const DOCUSIGN_STATUS_LABELS = {
 }
 
 export default function Offers() {
-  const { offers, offerTemplates, candidates, jobs, updateOfferStatus, uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, openModal } = useApp()
+  const { offers, offerTemplates, candidates, jobs, updateOfferStatus, uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, openModal, reload } = useApp()
   const [tab, setTab] = useState('offers') // 'offers' | 'templates'
   const [sendingId, setSendingId] = useState(null)
   const [sendModal, setSendModal] = useState(null) // offer object
