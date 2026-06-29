@@ -60,7 +60,7 @@ export default function AddCandidateModal({ onClose }) {
   }
 
   async function handleSubmit() {
-    if (!fname || !lname || !role) { setError('Please fill in first name, last name, and role.'); return }
+    if (!fname || !lname) { setError('Please fill in first name and last name.'); return }
     setSaving(true)
     setError('')
     try {
@@ -133,7 +133,7 @@ export default function AddCandidateModal({ onClose }) {
           <div className="form-row"><label className="form-label">Experience summary</label><textarea className="form-input" value={experience} onChange={e => setExperience(e.target.value)} placeholder="Brief background from resume…" rows={3} /></div>
           <div className="form-grid">
             <div className="form-row">
-              <label className="form-label">Role applying for *</label>
+              <label className="form-label">Role applying for (optional)</label>
               <select className="form-input" value={role} onChange={e => setRole(e.target.value)}>
                 <option value="">Select role…</option>
                 {activeJobs.map(j => <option key={j.id} value={j.title}>{j.title}</option>)}
