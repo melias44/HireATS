@@ -135,11 +135,12 @@ serve(async (req) => {
       documentName,
       emailSubject,
       emailBlurb,
-      substitutions,   // { CANDIDATE_NAME, ROLE, SALARY, START_DATE, TODAY, COMPANY }
+      substitutions,
+      previewOnly,     // if true, return filled doc without sending to DocuSign
     } = await req.json()
 
-    if (!signerEmail || !signerName || !documentBase64) {
-      return new Response(JSON.stringify({ error: "signerEmail, signerName, and documentBase64 are required" }), {
+    if (!documentBase64) {
+      return new Response(JSON.stringify({ error: "documentBase64 is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       })
     }
@@ -154,9 +155,21 @@ serve(async (req) => {
         finalBase64 = fillDocxTemplate(documentBase64, substitutions)
       } catch (e) {
         console.error("Template fill error (sending original):", e)
-        // Fall back to original if fill fails
         finalBase64 = documentBase64
       }
+    }
+
+    // Preview mode — return filled document without sending
+    if (previewOnly) {
+      return new Response(JSON.stringify({ documentBase64: finalBase64, documentName }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
+
+    if (!signerEmail || !signerName) {
+      return new Response(JSON.stringify({ error: "signerEmail and signerName are required to send" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
     }
 
     const accountId = Deno.env.get("DOCUSIGN_ACCOUNT_ID")!

@@ -252,6 +252,40 @@ export function AppProvider({ children, user }) {
     await supabase.from('offer_templates').delete().eq('id', templateId)
   }
 
+  function buildSubstitutions({ signerName, role, salary, startDate, managerTitle, commissionAmount, offerExpiration }) {
+    const fmt = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''
+    return {
+      'job_title': role || '',
+      'salary_amount': salary || '',
+      'anticipated_start_date': startDate ? fmt(startDate) : 'TBD',
+      'custom_manager_title': managerTitle || '',
+      'custom_commission_amount': commissionAmount || '',
+      'offer_expiration_date': offerExpiration ? fmt(offerExpiration) : '',
+    }
+  }
+
+  async function previewOffer({ templateId, salary, startDate, role, managerTitle, commissionAmount, offerExpiration, signerName }) {
+    const template = offerTemplates.find(t => t.id === templateId)
+    if (!template) throw new Error('Template not found')
+    const { data: fileData, error: dlError } = await supabase.storage.from('offer-templates').download(template.file_path)
+    if (dlError) throw dlError
+    const arrayBuffer = await fileData.arrayBuffer()
+    const uint8 = new Uint8Array(arrayBuffer)
+    let binary = ''
+    uint8.forEach(b => binary += String.fromCharCode(b))
+    const documentBase64 = btoa(binary)
+    const { data, error } = await supabase.functions.invoke('docusign-send', {
+      body: {
+        documentBase64,
+        documentName: template.file_name,
+        substitutions: buildSubstitutions({ signerName, role, salary, startDate, managerTitle, commissionAmount, offerExpiration }),
+        previewOnly: true,
+      },
+    })
+    if (error) throw error
+    return { documentBase64: data.documentBase64, documentName: data.documentName }
+  }
+
   async function sendOfferViaDocuSign(offerId, { signerEmail, signerName, templateId, salary, startDate, role, managerTitle, commissionAmount, offerExpiration }) {
     // 1. Download the template file from Supabase Storage
     const template = offerTemplates.find(t => t.id === templateId)
@@ -278,18 +312,7 @@ export function AppProvider({ children, user }) {
         documentName: template.file_name,
         emailSubject: `Your offer letter — ${role}`,
         emailBlurb: `Please review and sign your offer letter for the ${role} position. Salary: ${salary}. Start date: ${startDate || 'TBD'}.`,
-        substitutions: {
-          'job_title': role || '',
-          'salary_amount': salary || '',
-          'anticipated_start_date': startDate
-            ? new Date(startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-            : 'TBD',
-          'custom_manager_title': managerTitle || '',
-          'custom_commission_amount': commissionAmount || '',
-          'offer_expiration_date': offerExpiration
-            ? new Date(offerExpiration + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-            : '',
-        },
+        substitutions: buildSubstitutions({ signerName, role, salary, startDate, managerTitle, commissionAmount, offerExpiration }),
       },
     })
     if (error) throw error
@@ -321,7 +344,7 @@ export function AppProvider({ children, user }) {
       addCandidate, addJob, updateJobStatus, updateJobPublish,
       moveStage, addApplication, addNote,
       addInterview, addOffer, updateOfferStatus, updateOfferDocuSign,
-      uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign,
+      uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, previewOffer,
       modal, openModal, closeModal,
       user, reload: loadAll,
     }}>

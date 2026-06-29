@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
 
 export default function GenerateOfferModal({ onClose }) {
-  const { candidates, jobs, offerTemplates, addOffer, sendOfferViaDocuSign } = useApp()
+  const { candidates, jobs, offerTemplates, addOffer, sendOfferViaDocuSign, previewOffer } = useApp()
 
   const [candidateId, setCandidateId] = useState('')
   const [role, setRole] = useState('')
@@ -13,6 +13,7 @@ export default function GenerateOfferModal({ onClose }) {
   const [offerExpiration, setOfferExpiration] = useState('')
   const [templateId, setTemplateId] = useState(offerTemplates[0]?.id || '')
   const [sending, setSending] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
   const [error, setError] = useState('')
 
   const allCandidates = [...candidates].sort((a, b) => `${a.fname} ${a.lname}`.localeCompare(`${b.fname} ${b.lname}`))
@@ -26,6 +27,33 @@ export default function GenerateOfferModal({ onClose }) {
     if (offerApp) {
       const job = jobs.find(j => j.id === offerApp.job_id)
       setRole(job?.title || '')
+    }
+  }
+
+  async function handlePreview() {
+    if (!templateId) { setError('Select a template first.'); return }
+    setPreviewing(true)
+    setError('')
+    try {
+      const signerName = selectedCandidate ? `${selectedCandidate.fname} ${selectedCandidate.lname}` : 'Candidate'
+      const { documentBase64, documentName } = await previewOffer({
+        templateId, salary, startDate, role, managerTitle, commissionAmount, offerExpiration, signerName,
+      })
+      // Trigger browser download of the filled document
+      const binary = atob(documentBase64)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+      const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Preview - ${documentName}`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(`Preview failed: ${err.message}`)
+    } finally {
+      setPreviewing(false)
     }
   }
 
@@ -146,9 +174,17 @@ export default function GenerateOfferModal({ onClose }) {
         <div className="modal-footer">
           <button className="btn" onClick={onClose}>Cancel</button>
           <button
+            className="btn"
+            onClick={handlePreview}
+            disabled={previewing || sending || !templateId}
+            title="Downloads a filled copy to review before sending"
+          >
+            {previewing ? 'Generating…' : '👁 Preview offer'}
+          </button>
+          <button
             className="btn btn-primary"
             onClick={handleSend}
-            disabled={sending || offerTemplates.length === 0}
+            disabled={sending || previewing || offerTemplates.length === 0}
           >
             {sending ? 'Sending…' : 'Send via DocuSign'}
           </button>
