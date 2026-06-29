@@ -34,20 +34,12 @@ function fillDocxTemplate(base64: string, subs: Record<string, string>): string 
 
     // Process each paragraph independently
     xml = xml.replace(/<w:p\b([^>]*)>([\s\S]*?)<\/w:p>/g, (fullPara, pAttrs, content) => {
-      // Grab paragraph-level properties (indents, spacing, style)
-      const pPrMatch = content.match(/<w:pPr[\s\S]*?<\/w:pPr>/)
-      const pPr = pPrMatch ? pPrMatch[0] : ''
-
-      // Grab run-level properties from the first run (bold, italic, font, size)
-      const rPrMatch = content.match(/<w:rPr[\s\S]*?<\/w:rPr>/)
-      const rPr = rPrMatch ? rPrMatch[0] : ''
-
       // Collect all text across every <w:t> in this paragraph
       const allText = [...content.matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g)]
         .map(m => m[1])
         .join('')
 
-      // Apply all substitutions to the combined text
+      // Skip paragraphs with no placeholders — return untouched
       let newText = allText
       let changed = false
       for (const [key, value] of Object.entries(subs)) {
@@ -57,8 +49,25 @@ function fillDocxTemplate(base64: string, subs: Record<string, string>): string 
           changed = true
         }
       }
-
       if (!changed) return fullPara
+
+      // Grab full paragraph properties.
+      // Use GREEDY match ([\s\S]*) so nested <w:pPr> inside <w:pPrChange> is included.
+      // Lazy match would stop at the inner </w:pPr> and leave dangling XML that Word
+      // renders as visible text.
+      const pPrMatch = content.match(/<w:pPr\b[^>]*>[\s\S]*<\/w:pPr>/)
+      const pPr = pPrMatch ? pPrMatch[0] : ''
+
+      // Grab run properties from the FIRST ACTUAL RUN — not from the <w:rPr> inside <w:pPr>
+      // (the pPr's <w:rPr> is paragraph-mark formatting and may carry bold/color we don't want).
+      const afterPPr = pPr
+        ? content.slice(content.indexOf(pPr) + pPr.length)
+        : content
+      const firstRun = afterPPr.match(/<w:r\b[^>]*>([\s\S]*?)<\/w:r>/)
+      const rPrInRun = firstRun
+        ? firstRun[1].match(/<w:rPr\b[^>]*>[\s\S]*?<\/w:rPr>/)
+        : null
+      const rPr = rPrInRun ? rPrInRun[0] : ''
 
       // Rebuild: one run with the substituted text, preserving paragraph + run formatting
       return `<w:p${pAttrs}>${pPr}<w:r>${rPr}<w:t xml:space="preserve">${escapeXml(newText)}</w:t></w:r></w:p>`
