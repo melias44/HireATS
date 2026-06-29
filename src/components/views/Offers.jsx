@@ -10,7 +10,7 @@ const DOCUSIGN_STATUS_LABELS = {
 }
 
 export default function Offers() {
-  const { offers, offerTemplates, candidates, jobs, updateOfferStatus, uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, openModal, reload } = useApp()
+  const { offers, offerTemplates, candidates, jobs, updateOfferStatus, uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, downloadSignedOffer, openModal, reload } = useApp()
   const [tab, setTab] = useState('offers') // 'offers' | 'templates'
   const [sendingId, setSendingId] = useState(null)
   const [sendModal, setSendModal] = useState(null) // offer object
@@ -137,6 +137,18 @@ export default function Offers() {
                           <span className="status-pill" style={{ background: ds.bg, color: ds.color }}>{ds.label}</span>
                         </td>
                         <td style={{ whiteSpace: 'nowrap' }}>
+                          {o.signed_document_path && (
+                            <button
+                              className="btn btn-sm"
+                              style={{ marginRight: 4, background: 'var(--green-bg)', color: 'var(--green-text)', borderColor: '#BBF7D0' }}
+                              onClick={async () => {
+                                const url = await downloadSignedOffer(o.signed_document_path)
+                                window.open(url, '_blank')
+                              }}
+                            >
+                              📄 Signed copy
+                            </button>
+                          )}
                           {o.docusign_status === 'not_sent' || !o.docusign_status ? (
                             <button
                               className="btn btn-sm btn-primary"
@@ -146,9 +158,9 @@ export default function Offers() {
                             >
                               Send via DocuSign
                             </button>
-                          ) : (
+                          ) : o.docusign_status !== 'completed' ? (
                             <button className="btn btn-sm" onClick={() => openSendModal(o)}>Resend</button>
-                          )}
+                          ) : null}
                           {o.status === 'Pending' && (
                             <>
                               <button className="btn btn-sm" style={{ marginLeft: 4, background: 'var(--green-bg)', color: 'var(--green-text)', borderColor: '#BBF7D0' }} onClick={() => updateOfferStatus(o.id, 'Accepted')}>Accept</button>

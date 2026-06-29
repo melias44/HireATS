@@ -247,6 +247,14 @@ export function AppProvider({ children, user }) {
     return data
   }
 
+  async function downloadSignedOffer(signedDocumentPath) {
+    const { data, error } = await supabase.storage
+      .from('signed-offers')
+      .createSignedUrl(signedDocumentPath, 300)
+    if (error) throw error
+    return data.signedUrl
+  }
+
   async function deleteOfferTemplate(templateId, filePath) {
     await supabase.storage.from('offer-templates').remove([filePath])
     await supabase.from('offer_templates').delete().eq('id', templateId)
@@ -350,7 +358,7 @@ export function AppProvider({ children, user }) {
       addCandidate, addJob, updateJobStatus, updateJobPublish,
       moveStage, addApplication, addNote,
       addInterview, addOffer, updateOfferStatus, updateOfferDocuSign,
-      uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, previewOffer,
+      uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, previewOffer, downloadSignedOffer,
       modal, openModal, closeModal,
       user, reload: loadAll,
     }}>

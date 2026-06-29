@@ -143,24 +143,32 @@ async function getAccessToken(): Promise<string> {
   if (!userId)         throw new Error("Missing secret: DOCUSIGN_USER_ID — find your API Username on the DocuSign Apps & Keys page")
   if (!privateKeyPem)  throw new Error("Missing secret: DOCUSIGN_PRIVATE_KEY — run: npx supabase secrets set DOCUSIGN_PRIVATE_KEY=\"$(cat docusign_private.pem)\"")
 
-  // Import RSA private key — handles both PKCS#1 (BEGIN RSA PRIVATE KEY)
-  // and PKCS#8 (BEGIN PRIVATE KEY). DocuSign generates PKCS#1; Web Crypto needs PKCS#8.
-  const pemBody = privateKeyPem
+  const normalizedPem = privateKeyPem.replace(/\\n/g, '\n')
+  const pemBody = normalizedPem
     .replace(/-----[^-]+-----/g, '')
     .replace(/\s/g, '')
-  let derBytes = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0))
+  const derBytes = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0))
 
-  if (privateKeyPem.includes("BEGIN RSA PRIVATE KEY")) {
-    derBytes = pkcs1ToPkcs8(derBytes)
+  const keyDiag = `header="${normalizedPem.split('\n')[0]}" pemLen=${normalizedPem.length} b64Len=${pemBody.length} derLen=${derBytes.length} firstByte=0x${derBytes[0]?.toString(16)}`
+
+  let cryptoKey: CryptoKey
+  try {
+    cryptoKey = await crypto.subtle.importKey(
+      "pkcs8", derBytes,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false, ["sign"]
+    )
+  } catch (e1) {
+    try {
+      cryptoKey = await crypto.subtle.importKey(
+        "pkcs8", pkcs1ToPkcs8(derBytes),
+        { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+        false, ["sign"]
+      )
+    } catch (e2) {
+      throw new Error(`Key import failed [${keyDiag}] pkcs8err=${e1} pkcs1err=${e2}`)
+    }
   }
-
-  const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8",
-    derBytes,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"]
-  )
 
   // Build JWT
   const now = Math.floor(Date.now() / 1000)
