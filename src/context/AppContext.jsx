@@ -316,7 +316,7 @@ export function AppProvider({ children, user }) {
         documentName: template.file_name,
         emailSubject: `Your offer letter — ${role}`,
         emailBlurb: `Please review and sign your offer letter for the ${role} position. Salary: ${salary}. Start date: ${startDate || 'TBD'}.`,
-        substitutions: buildSubstitutions({ signerName, role, salary, startDate, managerTitle, commissionAmount, offerExpiration }),
+        substitutions: buildSubstitutions({ signerName, role, salary, startDate, managerTitle, commissionAmount, offerExpiration, annualBonus }),
       },
     })
     if (error) throw error

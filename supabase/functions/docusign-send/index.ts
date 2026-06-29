@@ -18,70 +18,59 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
-// Replace {{PLACEHOLDER}} tags in a DOCX file's XML
+// Fill {placeholder} tags in a DOCX file
+// Works by processing each paragraph as a unit — extracts all text, applies substitutions,
+// then rebuilds the paragraph. Handles Word's habit of splitting text across multiple runs.
 function fillDocxTemplate(base64: string, subs: Record<string, string>): string {
-  // Decode base64 → bytes
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
 
-  // Unzip the DOCX (it's a ZIP)
   const unzipped = unzipSync(bytes)
-
-  // Files to process (main doc + headers/footers)
-  const xmlFiles = Object.keys(unzipped).filter(
-    f => f.startsWith('word/') && f.endsWith('.xml')
-  )
+  const xmlFiles = Object.keys(unzipped).filter(f => f.startsWith('word/') && f.endsWith('.xml'))
 
   for (const file of xmlFiles) {
     let xml = strFromU8(unzipped[file])
 
-    // Step 1: collapse split placeholder runs
-    // Word sometimes splits {{PLACEHOLDER}} across multiple <w:r> runs — join them first
-    xml = collapseRuns(xml)
+    // Process each paragraph independently
+    xml = xml.replace(/<w:p\b([^>]*)>([\s\S]*?)<\/w:p>/g, (fullPara, pAttrs, content) => {
+      // Grab paragraph-level properties (indents, spacing, style)
+      const pPrMatch = content.match(/<w:pPr[\s\S]*?<\/w:pPr>/)
+      const pPr = pPrMatch ? pPrMatch[0] : ''
 
-    // Step 2: replace each placeholder
-    for (const [key, value] of Object.entries(subs)) {
-      const escaped = escapeXml(value)
-      xml = xml.split(`{${key}}`).join(escaped)
-    }
+      // Grab run-level properties from the first run (bold, italic, font, size)
+      const rPrMatch = content.match(/<w:rPr[\s\S]*?<\/w:rPr>/)
+      const rPr = rPrMatch ? rPrMatch[0] : ''
+
+      // Collect all text across every <w:t> in this paragraph
+      const allText = [...content.matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g)]
+        .map(m => m[1])
+        .join('')
+
+      // Apply all substitutions to the combined text
+      let newText = allText
+      let changed = false
+      for (const [key, value] of Object.entries(subs)) {
+        const ph = `{${key}}`
+        if (newText.includes(ph)) {
+          newText = newText.split(ph).join(value)
+          changed = true
+        }
+      }
+
+      if (!changed) return fullPara
+
+      // Rebuild: one run with the substituted text, preserving paragraph + run formatting
+      return `<w:p${pAttrs}>${pPr}<w:r>${rPr}<w:t xml:space="preserve">${escapeXml(newText)}</w:t></w:r></w:p>`
+    })
 
     unzipped[file] = strToU8(xml)
   }
 
-  // Rezip and encode back to base64
   const zipped = zipSync(unzipped)
   let result = ''
   zipped.forEach(b => result += String.fromCharCode(b))
   return btoa(result)
-}
-
-// Collapse adjacent <w:r> runs that together form a placeholder
-// so {{PLACEHOLDER}} isn't split like {{PLACE | HOLDER}}
-function collapseRuns(xml: string): string {
-  // Extract all text content from runs in a paragraph, check if combined they contain a placeholder,
-  // and if so rebuild a single run with the combined text
-  return xml.replace(/<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g, (paraMatch) => {
-    // Get all run texts in order
-    const runPattern = /(<w:r\b[^>]*>)([\s\S]*?)(<\/w:r>)/g
-    const texts: string[] = []
-    let m
-    while ((m = runPattern.exec(paraMatch)) !== null) {
-      const inner = m[2]
-      const textMatch = inner.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/)
-      texts.push(textMatch ? textMatch[1] : '')
-    }
-    const combined = texts.join('')
-    // Only bother rewriting if it looks like there might be a split placeholder
-    if (!combined.includes('{')) return paraMatch
-
-    // Rebuild: replace all runs with a single run containing combined text, preserving first run's props
-    const firstRunProps = paraMatch.match(/<w:r\b[^>]*>([\s\S]*?)<w:t/)
-    const rPr = firstRunProps ? (firstRunProps[1].match(/<w:rPr[\s\S]*?<\/w:rPr>/) || [''])[0] : ''
-    const newRun = `<w:r>${rPr}<w:t xml:space="preserve">${escapeXml(combined)}</w:t></w:r>`
-    // Replace all runs in the paragraph with one combined run
-    return paraMatch.replace(/(<w:r\b[^>]*>[\s\S]*?<\/w:r>)+/, newRun)
-  })
 }
 
 function escapeXml(str: string): string {
