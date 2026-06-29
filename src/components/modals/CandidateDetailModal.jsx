@@ -1,15 +1,11 @@
 import { useState } from 'react'
 import { useApp, avColor, initials, stageStyle, daysAgo, STAGES } from '../../context/AppContext'
-import { callAI, supabase } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 
 export default function CandidateDetailModal({ candidateId, onClose }) {
   const { candidates, jobs, moveStage, addNote, openModal, closeModal } = useApp()
   const [noteText, setNoteText] = useState('')
   const [noteRole, setNoteRole] = useState('General')
-  const [aiSummary, setAiSummary] = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
-  const [resumeUrl, setResumeUrl] = useState(null)
-
   async function handleDownloadResume(resumePath) {
     const { data } = await supabase.storage.from('resumes').createSignedUrl(resumePath, 60)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
@@ -26,28 +22,6 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
     if (!noteText.trim()) return
     await addNote(c.id, noteText.trim(), noteRole)
     setNoteText('')
-  }
-
-  async function handleSummarize() {
-    setAiLoading(true)
-    setAiSummary('')
-    try {
-      const appSummary = apps.map(a => {
-        const job = jobs.find(j => j.id === a.job_id)
-        return `${job?.title || a.role || 'Unknown role'} (${a.stage})`
-      }).join(', ')
-      const notesSummary = notes.length
-        ? notes.map(n => `[${n.job_title}] ${n.text}`).join('. ')
-        : 'No notes yet.'
-      const text = await callAI(
-        `Write a brief 3-4 sentence HR recruiter assessment of ${c.fname} ${c.lname}. They came from ${c.source} and are currently being considered for: ${appSummary}. Notes: ${notesSummary}. Give a concise cross-role assessment — are they a strong candidate overall, which role seems the best fit, and what's the recommended next step? Be specific and practical.`
-      )
-      setAiSummary(text)
-    } catch (err) {
-      setAiSummary('AI summary failed. Make sure the Edge Function is deployed.')
-    } finally {
-      setAiLoading(false)
-    }
   }
 
   return (
@@ -171,22 +145,6 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
 
             {/* Right column */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {/* AI summary */}
-              <div className="detail-card">
-                <div className="detail-card-title">AI candidate summary</div>
-                <div className="ai-panel" style={{ margin: 0 }}>
-                  <div className="ai-panel-head"><div className="ai-dot" />&nbsp;Summary</div>
-                  <div className="ai-output">
-                    {aiLoading
-                      ? <span className="ai-loading"><span className="spinner" />Analyzing…</span>
-                      : aiSummary || 'Click "Summarize" to generate an AI assessment.'}
-                  </div>
-                </div>
-                <button className="btn btn-sm" style={{ marginTop: 10, width: '100%' }} onClick={handleSummarize} disabled={aiLoading}>
-                  ✨ Summarize candidate
-                </button>
-              </div>
-
               {/* Add note */}
               <div className="detail-card">
                 <div className="detail-card-title">Add note</div>
