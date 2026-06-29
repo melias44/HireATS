@@ -286,7 +286,11 @@ export function AppProvider({ children, user }) {
         previewOnly: true,
       },
     })
-    if (error) throw error
+    if (error) {
+      let msg = error.message
+      try { const b = await error.context?.json?.(); if (b?.error) msg = b.error } catch (_) {}
+      throw new Error(msg)
+    }
     return { documentBase64: data.documentBase64, documentName: data.documentName }
   }
 
@@ -319,7 +323,11 @@ export function AppProvider({ children, user }) {
         substitutions: buildSubstitutions({ signerName, role, salary, startDate, managerTitle, commissionAmount, offerExpiration, annualBonus }),
       },
     })
-    if (error) throw error
+    if (error) {
+      let msg = error.message
+      try { const b = await error.context?.json?.(); if (b?.error) msg = b.error } catch (_) {}
+      throw new Error(msg)
+    }
 
     // 4. Update offer record with DocuSign envelope info
     await supabase.from('offers').update({

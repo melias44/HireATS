@@ -18,9 +18,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
-// Fill {placeholder} tags in a DOCX file
-// Works by processing each paragraph as a unit — extracts all text, applies substitutions,
-// then rebuilds the paragraph. Handles Word's habit of splitting text across multiple runs.
+// Fill {placeholder} tags in a DOCX file.
+//
+// Two-pass strategy:
+//   Pass 1 — direct string replacement. This handles placeholders that live entirely
+//             within a single <w:t> tag and preserves ALL run/paragraph formatting.
+//   Pass 2 — paragraph-level collapse, only for any placeholders that Word split
+//             across multiple runs (and therefore survived pass 1).
+//             Only those specific paragraphs get rebuilt; everything else is untouched.
 function fillDocxTemplate(base64: string, subs: Record<string, string>): string {
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
@@ -32,46 +37,51 @@ function fillDocxTemplate(base64: string, subs: Record<string, string>): string 
   for (const file of xmlFiles) {
     let xml = strFromU8(unzipped[file])
 
-    // Process each paragraph independently
-    xml = xml.replace(/<w:p\b([^>]*)>([\s\S]*?)<\/w:p>/g, (fullPara, pAttrs, content) => {
-      // Collect all text across every <w:t> in this paragraph
-      const allText = [...content.matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g)]
-        .map(m => m[1])
-        .join('')
+    // ── Pass 1: direct replacement (preserves all formatting) ──────────────
+    for (const [key, value] of Object.entries(subs)) {
+      xml = xml.split(`{${key}}`).join(escapeXml(value))
+    }
 
-      // Skip paragraphs with no placeholders — return untouched
-      let newText = allText
-      let changed = false
-      for (const [key, value] of Object.entries(subs)) {
-        const ph = `{${key}}`
-        if (newText.includes(ph)) {
-          newText = newText.split(ph).join(value)
-          changed = true
+    // ── Pass 2: collapse split-run placeholders ─────────────────────────────
+    // Only runs if there's still a '{' left in the XML (means at least one placeholder
+    // is split across runs). We only rebuild paragraphs that actually need it.
+    if (xml.includes('{')) {
+      xml = xml.replace(/<w:p\b([^>]*)>([\s\S]*?)<\/w:p>/g, (fullPara, pAttrs, content) => {
+        // Collect all text across every <w:t> in this paragraph
+        const allText = [...content.matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g)]
+          .map(m => m[1])
+          .join('')
+
+        // Any remaining placeholders in this paragraph?
+        let newText = allText
+        let changed = false
+        for (const [key, value] of Object.entries(subs)) {
+          if (newText.includes(`{${key}}`)) {
+            newText = newText.split(`{${key}}`).join(value)
+            changed = true
+          }
         }
-      }
-      if (!changed) return fullPara
+        if (!changed) return fullPara   // nothing to do — return original XML untouched
 
-      // Grab full paragraph properties.
-      // Use GREEDY match ([\s\S]*) so nested <w:pPr> inside <w:pPrChange> is included.
-      // Lazy match would stop at the inner </w:pPr> and leave dangling XML that Word
-      // renders as visible text.
-      const pPrMatch = content.match(/<w:pPr\b[^>]*>[\s\S]*<\/w:pPr>/)
-      const pPr = pPrMatch ? pPrMatch[0] : ''
+        // Grab full paragraph properties.
+        // Greedy ([\s\S]*) so nested <w:pPr> inside <w:pPrChange> is included in full —
+        // the lazy version stops at the inner </w:pPr> and leaves dangling XML as visible text.
+        const pPrMatch = content.match(/<w:pPr\b[^>]*>[\s\S]*<\/w:pPr>/)
+        const pPr = pPrMatch ? pPrMatch[0] : ''
 
-      // Grab run properties from the FIRST ACTUAL RUN — not from the <w:rPr> inside <w:pPr>
-      // (the pPr's <w:rPr> is paragraph-mark formatting and may carry bold/color we don't want).
-      const afterPPr = pPr
-        ? content.slice(content.indexOf(pPr) + pPr.length)
-        : content
-      const firstRun = afterPPr.match(/<w:r\b[^>]*>([\s\S]*?)<\/w:r>/)
-      const rPrInRun = firstRun
-        ? firstRun[1].match(/<w:rPr\b[^>]*>[\s\S]*?<\/w:rPr>/)
-        : null
-      const rPr = rPrInRun ? rPrInRun[0] : ''
+        // Get run properties from the FIRST ACTUAL RUN after the pPr block.
+        // (pPr can contain its own <w:rPr> for the paragraph mark — we must not use that
+        //  or we'll apply paragraph-mark formatting like bold to the new run.)
+        const afterPPr = pPr ? content.slice(content.indexOf(pPr) + pPr.length) : content
+        const firstRun = afterPPr.match(/<w:r\b[^>]*>([\s\S]*?)<\/w:r>/)
+        const rPrInRun = firstRun
+          ? firstRun[1].match(/<w:rPr\b[^>]*>[\s\S]*?<\/w:rPr>/)
+          : null
+        const rPr = rPrInRun ? rPrInRun[0] : ''
 
-      // Rebuild: one run with the substituted text, preserving paragraph + run formatting
-      return `<w:p${pAttrs}>${pPr}<w:r>${rPr}<w:t xml:space="preserve">${escapeXml(newText)}</w:t></w:r></w:p>`
-    })
+        return `<w:p${pAttrs}>${pPr}<w:r>${rPr}<w:t xml:space="preserve">${escapeXml(newText)}</w:t></w:r></w:p>`
+      })
+    }
 
     unzipped[file] = strToU8(xml)
   }
@@ -91,30 +101,79 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;')
 }
 
-async function getAccessToken(): Promise<string> {
-  const integrationKey = Deno.env.get("DOCUSIGN_INTEGRATION_KEY")!
-  const secretKey = Deno.env.get("DOCUSIGN_SECRET_KEY")!
+// ── DocuSign JWT Bearer auth ─────────────────────────────────────────────────
+// DocuSign doesn't support client_credentials. Server-to-server requires JWT.
+// Setup: generate RSA keypair, add public key to DocuSign Apps & Keys, then:
+//   npx supabase secrets set DOCUSIGN_USER_ID=<api-username-guid> DOCUSIGN_PRIVATE_KEY="$(cat private.pem)"
 
-  const res = await fetch("https://account-d.docusign.com/oauth/token", {
+function b64url(input: string | ArrayBuffer): string {
+  const str = typeof input === 'string'
+    ? btoa(input)
+    : btoa(String.fromCharCode(...new Uint8Array(input)))
+  return str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+async function getAccessToken(): Promise<string> {
+  const integrationKey = Deno.env.get("DOCUSIGN_INTEGRATION_KEY")
+  const userId       = Deno.env.get("DOCUSIGN_USER_ID")
+  const privateKeyPem = Deno.env.get("DOCUSIGN_PRIVATE_KEY")
+  const basePath     = Deno.env.get("DOCUSIGN_BASE_PATH") || "https://demo.docusign.net/restapi"
+  const authHost     = basePath.includes("demo") ? "account-d.docusign.com" : "account.docusign.com"
+
+  if (!integrationKey) throw new Error("Missing secret: DOCUSIGN_INTEGRATION_KEY")
+  if (!userId)         throw new Error("Missing secret: DOCUSIGN_USER_ID — find your API Username on the DocuSign Apps & Keys page")
+  if (!privateKeyPem)  throw new Error("Missing secret: DOCUSIGN_PRIVATE_KEY — run: npx supabase secrets set DOCUSIGN_PRIVATE_KEY=\"$(cat docusign_private.pem)\"")
+
+  // Import RSA private key (supports both PKCS#8 and PKCS#1 PEM)
+  const pemBody = privateKeyPem
+    .replace(/-----[^-]+-----/g, '')
+    .replace(/\s/g, '')
+  const derBytes = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0))
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    derBytes,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  )
+
+  // Build JWT
+  const now = Math.floor(Date.now() / 1000)
+  const header  = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))
+  const payload = b64url(JSON.stringify({
+    iss: integrationKey,
+    sub: userId,
+    aud: authHost,
+    iat: now,
+    exp: now + 3600,
+    scope: "signature impersonation",
+  }))
+  const sigInput  = `${header}.${payload}`
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    cryptoKey,
+    new TextEncoder().encode(sigInput)
+  )
+  const jwt = `${sigInput}.${b64url(signature)}`
+
+  // Exchange for access token
+  const res = await fetch(`https://${authHost}/oauth/token`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Authorization": "Basic " + btoa(`${integrationKey}:${secretKey}`),
-    },
-    body: "grant_type=client_credentials&scope=signature%20impersonation",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
   })
 
   if (!res.ok) {
-    const res2 = await fetch("https://account.docusign.com/oauth/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": "Basic " + btoa(`${integrationKey}:${secretKey}`),
-      },
-      body: "grant_type=client_credentials&scope=signature",
-    })
-    if (!res2.ok) throw new Error(`DocuSign auth failed: ${await res2.text()}`)
-    return (await res2.json()).access_token
+    const err = await res.text()
+    if (err.includes("consent_required")) {
+      throw new Error(
+        `DocuSign consent required — visit this URL once in a browser to grant access:\n` +
+        `https://${authHost}/oauth/auth?response_type=code&scope=signature%20impersonation` +
+        `&client_id=${integrationKey}&redirect_uri=https://developers.docusign.com/platform/auth/consent`
+      )
+    }
+    throw new Error(`DocuSign JWT auth failed: ${err}`)
   }
 
   return (await res.json()).access_token
@@ -170,7 +229,8 @@ serve(async (req) => {
       })
     }
 
-    const accountId = Deno.env.get("DOCUSIGN_ACCOUNT_ID")!
+    const accountId = Deno.env.get("DOCUSIGN_ACCOUNT_ID")
+    if (!accountId) throw new Error("Missing secret: DOCUSIGN_ACCOUNT_ID — set it with: npx supabase secrets set DOCUSIGN_ACCOUNT_ID=... --project-ref <ref>")
     const basePath = Deno.env.get("DOCUSIGN_BASE_PATH") || "https://demo.docusign.net/restapi"
     const token = await getAccessToken()
 
