@@ -73,7 +73,7 @@ function collapseRuns(xml: string): string {
     }
     const combined = texts.join('')
     // Only bother rewriting if it looks like there might be a split placeholder
-    if (!combined.includes('{{')) return paraMatch
+    if (!combined.includes('{')) return paraMatch
 
     // Rebuild: replace all runs with a single run containing combined text, preserving first run's props
     const firstRunProps = paraMatch.match(/<w:r\b[^>]*>([\s\S]*?)<w:t/)
