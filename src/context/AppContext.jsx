@@ -262,6 +262,7 @@ export function AppProvider({ children, user }) {
       'custom_manager_title': managerTitle || '',
       'custom_commission_amount': commissionAmount || '',
       'offer_expiration_date': offerExpiration ? fmt(offerExpiration) : '',
+      'candidate_name': signerName || '',
       'today_date': today,
       'offered_annual_bonus': annualBonus || '',
     }
