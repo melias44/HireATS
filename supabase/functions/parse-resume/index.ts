@@ -1,12 +1,59 @@
-// Supabase Edge Function — parses a resume file and extracts candidate info
-// Deploy: supabase functions deploy parse-resume
-// Uses the same ANTHROPIC_API_KEY secret as ai-generate
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+}
+
+// Extract readable text from a PDF binary
+function extractPdfText(bytes: Uint8Array): string {
+  const str = new TextDecoder("latin1").decode(bytes)
+  const texts: string[] = []
+
+  // Pull text from BT...ET blocks (standard PDF text objects)
+  for (const block of str.matchAll(/BT([\s\S]*?)ET/g)) {
+    const content = block[1]
+    // Tj — single string: (text) Tj
+    for (const m of content.matchAll(/\(([^)\\]|\\[\s\S])*\)\s*Tj/g)) {
+      const raw = m[0].slice(1, m[0].lastIndexOf(")"))
+        .replace(/\\n/g, " ").replace(/\\r/g, " ").replace(/\\t/g, " ")
+        .replace(/\\\(/g, "(").replace(/\\\)/g, ")").replace(/\\\\/g, "\\")
+      if (raw.trim()) texts.push(raw.trim())
+    }
+    // TJ — array of strings: [(text)(text)] TJ
+    for (const arr of content.matchAll(/\[([^\]]*)\]\s*TJ/g)) {
+      const parts: string[] = []
+      for (const s of arr[1].matchAll(/\(([^)]*)\)/g)) {
+        parts.push(s[1])
+      }
+      if (parts.length) texts.push(parts.join(""))
+    }
+  }
+
+  if (texts.length > 0) {
+    return texts.join(" ").replace(/\s+/g, " ").trim().substring(0, 7000)
+  }
+
+  // Fallback: grab lines that look like readable text
+  const lines = str
+    .split(/[\r\n]+/)
+    .map(l => l.replace(/[^\x20-\x7E]/g, " ").replace(/\s+/g, " ").trim())
+    .filter(l => l.length > 4 && /[a-zA-Z]{3,}/.test(l))
+  return lines.join("\n").substring(0, 7000)
+}
+
+// Extract readable text from a DOCX (which is a ZIP with XML inside)
+function extractDocxText(bytes: Uint8Array): string {
+  // Decode as UTF-8 with replacement so we don't throw on binary
+  const str = new TextDecoder("utf-8", { fatal: false }).decode(bytes)
+  // Strip XML tags and decode basic entities
+  return str
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ").replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim()
+    .substring(0, 7000)
 }
 
 serve(async (req) => {
@@ -18,80 +65,38 @@ serve(async (req) => {
     const { fileBase64, fileType } = await req.json()
 
     if (!fileBase64) {
-      return new Response(JSON.stringify({ error: "fileBase64 is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "No file provided" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       })
     }
 
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY")
     if (!anthropicKey) {
-      return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not set" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       })
     }
 
+    // Decode base64 → bytes
+    const binaryStr = atob(fileBase64)
+    const bytes = new Uint8Array(binaryStr.length)
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i)
+    }
+
+    // Extract text
     const isPdf = fileType === "application/pdf"
+    const resumeText = isPdf ? extractPdfText(bytes) : extractDocxText(bytes)
 
-    let messages: any[]
+    console.log("Extracted text length:", resumeText.length)
+    console.log("Extracted text preview:", resumeText.substring(0, 200))
 
-    if (isPdf) {
-      // Use Claude's native PDF support
-      messages = [
-        {
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: {
-                type: "base64",
-                media_type: "application/pdf",
-                data: fileBase64,
-              },
-            },
-            {
-              type: "text",
-              text: `Extract the following information from this resume and return it as JSON only (no markdown, no explanation):
-{
-  "fname": "first name",
-  "lname": "last name",
-  "email": "email address or empty string",
-  "phone": "phone number or empty string",
-  "linkedin": "linkedin URL or empty string",
-  "location": "city, state or empty string",
-  "experience": "2-3 sentence summary of their background and most recent roles",
-  "source": "LinkedIn"
-}
-If you cannot find a field, use an empty string. Always return valid JSON.`,
-            },
-          ],
-        },
-      ]
-    } else {
-      // For Word docs, treat as text-based and extract what we can
-      messages = [
-        {
-          role: "user",
-          content: `I'm going to give you base64-encoded content from a Word document resume. Please extract candidate information and return JSON only (no markdown, no explanation):
-{
-  "fname": "first name",
-  "lname": "last name",
-  "email": "email address or empty string",
-  "phone": "phone number or empty string",
-  "linkedin": "linkedin URL or empty string",
-  "location": "city, state or empty string",
-  "experience": "2-3 sentence summary of their background and most recent roles",
-  "source": "LinkedIn"
-}
-
-Note: This is a Word document. Do your best to extract text from the base64 content. If you cannot parse it, return the JSON with empty strings and experience set to "Please review the uploaded resume manually."
-
-Base64 content (first 2000 chars): ${fileBase64.substring(0, 2000)}
-
-Return only valid JSON.`,
-        },
-      ]
+    if (resumeText.length < 30) {
+      return new Response(JSON.stringify({
+        fname: "", lname: "", email: "", phone: "",
+        linkedin: "", location: "",
+        experience: "Could not extract text from resume. Please fill in fields manually.",
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } })
     }
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -100,30 +105,52 @@ Return only valid JSON.`,
         "Content-Type": "application/json",
         "x-api-key": anthropicKey,
         "anthropic-version": "2023-06-01",
-        "anthropic-beta": "pdfs-2024-09-25",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-8",
-        max_tokens: 1000,
-        messages,
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 600,
+        messages: [{
+          role: "user",
+          content: `Extract candidate information from the resume text below. Return ONLY a raw JSON object — no markdown, no code blocks, no explanation.
+
+Format:
+{"fname":"","lname":"","email":"","phone":"","linkedin":"","location":"","experience":""}
+
+Rules:
+- fname / lname: first and last name
+- email: email address or empty string
+- phone: phone number or empty string
+- linkedin: LinkedIn URL or empty string
+- location: city, state or empty string
+- experience: 2-3 sentence summary of their background and most recent role
+- Use empty string for anything not found
+
+Resume text:
+${resumeText}`,
+        }],
       }),
     })
 
-    const data = await response.json()
-    const text = data.content?.[0]?.text ?? "{}"
+    if (!response.ok) {
+      const errText = await response.text()
+      console.error("Anthropic API error:", response.status, errText)
+      throw new Error(`Anthropic API returned ${response.status}: ${errText}`)
+    }
 
-    // Parse the JSON response
+    const apiData = await response.json()
+    const rawText = apiData.content?.[0]?.text ?? "{}"
+    console.log("Claude response:", rawText)
+
     let parsed
     try {
-      // Strip any markdown code blocks if present
-      const clean = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
-      parsed = JSON.parse(clean)
+      const match = rawText.match(/\{[\s\S]*\}/)
+      parsed = JSON.parse(match ? match[0] : rawText)
     } catch {
+      console.error("JSON parse failed:", rawText)
       parsed = {
         fname: "", lname: "", email: "", phone: "",
         linkedin: "", location: "",
-        experience: "Could not parse resume automatically. Please fill in details manually.",
-        source: "Other",
+        experience: "Parsed but could not read result. Please fill in manually.",
       }
     }
 
@@ -131,6 +158,7 @@ Return only valid JSON.`,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
   } catch (err) {
+    console.error("parse-resume fatal error:", String(err))
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

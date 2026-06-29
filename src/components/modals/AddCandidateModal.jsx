@@ -53,7 +53,7 @@ export default function AddCandidateModal({ onClose }) {
 
       setParseStatus('✓ Resume parsed — review the fields below and edit if needed.')
     } catch (err) {
-      setParseStatus('Could not auto-parse resume. Fill in the fields manually.')
+      setParseStatus(`Parse error: ${err?.message || String(err)}`)
     } finally {
       setParsing(false)
     }
