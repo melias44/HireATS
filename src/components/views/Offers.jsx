@@ -23,11 +23,17 @@ export default function Offers() {
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [sendError, setSendError] = useState('')
   const [sending, setSending] = useState(false)
+  const [managerTitle, setManagerTitle] = useState('')
+  const [commissionAmount, setCommissionAmount] = useState('')
+  const [offerExpiration, setOfferExpiration] = useState('')
 
   function openSendModal(offer) {
     setSendModal(offer)
     setSelectedTemplateId(offerTemplates[0]?.id || '')
     setSendError('')
+    setManagerTitle('')
+    setCommissionAmount('')
+    setOfferExpiration('')
   }
 
   async function handleSend() {
@@ -45,6 +51,9 @@ export default function Offers() {
         salary: sendModal.salary,
         startDate: sendModal.start_date,
         role: sendModal.job_title,
+        managerTitle,
+        commissionAmount,
+        offerExpiration,
       })
       setSendModal(null)
     } catch (err) {
@@ -241,6 +250,20 @@ export default function Offers() {
                   <option value="">Select template…</option>
                   {offerTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
+              </div>
+              <div className="form-grid">
+                <div className="form-row">
+                  <label className="form-label">Manager title <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>({'{custom_manager_title}'})</span></label>
+                  <input className="form-input" value={managerTitle} onChange={e => setManagerTitle(e.target.value)} placeholder="e.g. VP of Editorial" />
+                </div>
+                <div className="form-row">
+                  <label className="form-label">Commission amount <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>({'{custom_commission_amount}'})</span></label>
+                  <input className="form-input" value={commissionAmount} onChange={e => setCommissionAmount(e.target.value)} placeholder="e.g. $10,000 or N/A" />
+                </div>
+              </div>
+              <div className="form-row">
+                <label className="form-label">Offer expiration date <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>({'{offer_expiration_date}'})</span></label>
+                <input className="form-input" type="date" value={offerExpiration} onChange={e => setOfferExpiration(e.target.value)} />
               </div>
               <div style={{ background: 'var(--accent-bg)', border: '1px solid #BFDBFE', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 12, color: 'var(--accent-text)' }}>
                 The candidate will receive an email from DocuSign with your offer letter attached. Once they sign, the status updates automatically.

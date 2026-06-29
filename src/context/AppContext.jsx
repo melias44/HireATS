@@ -252,7 +252,7 @@ export function AppProvider({ children, user }) {
     await supabase.from('offer_templates').delete().eq('id', templateId)
   }
 
-  async function sendOfferViaDocuSign(offerId, { signerEmail, signerName, templateId, salary, startDate, role }) {
+  async function sendOfferViaDocuSign(offerId, { signerEmail, signerName, templateId, salary, startDate, role, managerTitle, commissionAmount, offerExpiration }) {
     // 1. Download the template file from Supabase Storage
     const template = offerTemplates.find(t => t.id === templateId)
     if (!template) throw new Error('Template not found')
@@ -279,12 +279,16 @@ export function AppProvider({ children, user }) {
         emailSubject: `Your offer letter — ${role}`,
         emailBlurb: `Please review and sign your offer letter for the ${role} position. Salary: ${salary}. Start date: ${startDate || 'TBD'}.`,
         substitutions: {
-          CANDIDATE_NAME: signerName,
-          ROLE: role,
-          SALARY: salary || '',
-          START_DATE: startDate || 'TBD',
-          TODAY: today,
-          COMPANY: 'Bustle Digital Group',
+          'job_title': role || '',
+          'salary_amount': salary || '',
+          'anticipated_start_date': startDate
+            ? new Date(startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+            : 'TBD',
+          'custom_manager_title': managerTitle || '',
+          'custom_commission_amount': commissionAmount || '',
+          'offer_expiration_date': offerExpiration
+            ? new Date(offerExpiration + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+            : '',
         },
       },
     })

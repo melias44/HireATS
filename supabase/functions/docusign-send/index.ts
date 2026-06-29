@@ -43,7 +43,7 @@ function fillDocxTemplate(base64: string, subs: Record<string, string>): string 
     // Step 2: replace each placeholder
     for (const [key, value] of Object.entries(subs)) {
       const escaped = escapeXml(value)
-      xml = xml.split(`{{${key}}}`).join(escaped)
+      xml = xml.split(`{${key}}`).join(escaped)
     }
 
     unzipped[file] = strToU8(xml)
@@ -180,19 +180,12 @@ serve(async (req) => {
           routingOrder: "1",
           tabs: {
             signHereTabs: [{
-              anchorString: "/sig1/",
+              anchorString: "{candidate_signature}",
               anchorXOffset: "0",
               anchorYOffset: "0",
               anchorIgnoreIfNotPresent: "true",
               pageNumber: "1",
               xPosition: "100",
-              yPosition: "700",
-            }],
-            dateSignedTabs: [{
-              anchorString: "/date1/",
-              anchorIgnoreIfNotPresent: "true",
-              pageNumber: "1",
-              xPosition: "300",
               yPosition: "700",
             }],
           },
