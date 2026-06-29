@@ -269,6 +269,7 @@ export function AppProvider({ children, user }) {
     const documentBase64 = btoa(binary)
 
     // 3. Call the Edge Function
+    const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     const { data, error } = await supabase.functions.invoke('docusign-send', {
       body: {
         signerEmail,
@@ -277,6 +278,14 @@ export function AppProvider({ children, user }) {
         documentName: template.file_name,
         emailSubject: `Your offer letter — ${role}`,
         emailBlurb: `Please review and sign your offer letter for the ${role} position. Salary: ${salary}. Start date: ${startDate || 'TBD'}.`,
+        substitutions: {
+          CANDIDATE_NAME: signerName,
+          ROLE: role,
+          SALARY: salary || '',
+          START_DATE: startDate || 'TBD',
+          TODAY: today,
+          COMPANY: 'Bustle Digital Group',
+        },
       },
     })
     if (error) throw error
