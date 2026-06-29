@@ -282,7 +282,7 @@ export function AppProvider({ children, user }) {
       body: {
         documentBase64,
         documentName: template.file_name,
-        substitutions: buildSubstitutions({ signerName, role, salary, startDate, managerTitle, commissionAmount, offerExpiration }),
+        substitutions: buildSubstitutions({ signerName, role, salary, startDate, managerTitle, commissionAmount, offerExpiration, annualBonus }),
         previewOnly: true,
       },
     })
