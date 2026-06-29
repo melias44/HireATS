@@ -101,6 +101,25 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;')
 }
 
+// Convert PKCS#1 RSA private key DER → PKCS#8 DER (Web Crypto requires PKCS#8)
+function pkcs1ToPkcs8(pkcs1: Uint8Array): Uint8Array {
+  const cat = (...a: Uint8Array[]) => {
+    const out = new Uint8Array(a.reduce((s, x) => s + x.length, 0))
+    let i = 0; for (const x of a) { out.set(x, i); i += x.length } return out
+  }
+  const len = (n: number) => n < 128 ? new Uint8Array([n])
+    : n < 256 ? new Uint8Array([0x81, n])
+    : new Uint8Array([0x82, n >> 8 & 0xff, n & 0xff])
+  const seq = (...parts: Uint8Array[]) => { const b = cat(...parts); return cat(new Uint8Array([0x30]), len(b.length), b) }
+
+  const version   = new Uint8Array([0x02, 0x01, 0x00])
+  const oid       = new Uint8Array([0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01])
+  const nullBytes = new Uint8Array([0x05, 0x00])
+  const algId     = seq(oid, nullBytes)
+  const privKey   = cat(new Uint8Array([0x04]), len(pkcs1.length), pkcs1)
+  return seq(version, algId, privKey)
+}
+
 // ── DocuSign JWT Bearer auth ─────────────────────────────────────────────────
 // DocuSign doesn't support client_credentials. Server-to-server requires JWT.
 // Setup: generate RSA keypair, add public key to DocuSign Apps & Keys, then:
@@ -124,11 +143,16 @@ async function getAccessToken(): Promise<string> {
   if (!userId)         throw new Error("Missing secret: DOCUSIGN_USER_ID — find your API Username on the DocuSign Apps & Keys page")
   if (!privateKeyPem)  throw new Error("Missing secret: DOCUSIGN_PRIVATE_KEY — run: npx supabase secrets set DOCUSIGN_PRIVATE_KEY=\"$(cat docusign_private.pem)\"")
 
-  // Import RSA private key (supports both PKCS#8 and PKCS#1 PEM)
+  // Import RSA private key — handles both PKCS#1 (BEGIN RSA PRIVATE KEY)
+  // and PKCS#8 (BEGIN PRIVATE KEY). DocuSign generates PKCS#1; Web Crypto needs PKCS#8.
   const pemBody = privateKeyPem
     .replace(/-----[^-]+-----/g, '')
     .replace(/\s/g, '')
-  const derBytes = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0))
+  let derBytes = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0))
+
+  if (privateKeyPem.includes("BEGIN RSA PRIVATE KEY")) {
+    derBytes = pkcs1ToPkcs8(derBytes)
+  }
 
   const cryptoKey = await crypto.subtle.importKey(
     "pkcs8",

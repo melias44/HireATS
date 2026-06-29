@@ -26,6 +26,7 @@ export default function Offers() {
   const [managerTitle, setManagerTitle] = useState('')
   const [commissionAmount, setCommissionAmount] = useState('')
   const [offerExpiration, setOfferExpiration] = useState('')
+  const [annualBonus, setAnnualBonus] = useState('')
 
   function openSendModal(offer) {
     setSendModal(offer)
@@ -34,6 +35,7 @@ export default function Offers() {
     setManagerTitle('')
     setCommissionAmount('')
     setOfferExpiration('')
+    setAnnualBonus('')
   }
 
   async function handleSend() {
@@ -54,6 +56,7 @@ export default function Offers() {
         managerTitle,
         commissionAmount,
         offerExpiration,
+        annualBonus,
       })
       setSendModal(null)
     } catch (err) {
@@ -264,6 +267,10 @@ export default function Offers() {
               <div className="form-row">
                 <label className="form-label">Offer expiration date <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>({'{offer_expiration_date}'})</span></label>
                 <input className="form-input" type="date" value={offerExpiration} onChange={e => setOfferExpiration(e.target.value)} />
+              </div>
+              <div className="form-row">
+                <label className="form-label">Annual bonus <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>({'{offered_annual_bonus}'})</span></label>
+                <input className="form-input" value={annualBonus} onChange={e => setAnnualBonus(e.target.value)} placeholder="e.g. $5,000 or N/A" />
               </div>
               <div style={{ background: 'var(--accent-bg)', border: '1px solid #BFDBFE', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 12, color: 'var(--accent-text)' }}>
                 The candidate will receive an email from DocuSign with your offer letter attached. Once they sign, the status updates automatically.
