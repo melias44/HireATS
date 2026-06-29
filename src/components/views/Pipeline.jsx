@@ -21,12 +21,17 @@ export default function Pipeline() {
     }))
   )
 
+  // Candidates with no applications go into Unassigned
+  let unassigned = candidates.filter(c => !c.applications || c.applications.length === 0)
+
   if (search) {
     const s = search.toLowerCase()
     cards = cards.filter(x => `${x.fname} ${x.lname} ${x.role}`.toLowerCase().includes(s))
+    unassigned = unassigned.filter(c => `${c.fname} ${c.lname}`.toLowerCase().includes(s))
   }
   if (roleFilter) {
     cards = cards.filter(x => x.role === roleFilter)
+    if (roleFilter) unassigned = [] // hide unassigned when filtering by role
   }
 
   const activeStages = STAGES.filter(s => s !== 'Rejected')
@@ -51,6 +56,37 @@ export default function Pipeline() {
       </div>
       <div className="board-wrap">
         <div className="board">
+          {/* Unassigned column */}
+          {unassigned.length > 0 && (
+            <div className="board-col">
+              <div className="col-header">
+                <span className="col-title">Unassigned</span>
+                <span className="col-count">{unassigned.length}</span>
+              </div>
+              <div className="col-cards">
+                {unassigned.map(c => {
+                  const a = avColor(c.fname)
+                  return (
+                    <div key={c.id} className="cand-card" onClick={() => openModal('candidateDetail', { candidateId: c.id })}>
+                      <div className="cand-top">
+                        <div className="avatar" style={{ width: 32, height: 32, fontSize: 12, background: a.bg, color: a.color }}>
+                          {initials(c.fname, c.lname)}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div className="cand-name">{c.fname} {c.lname}</div>
+                          <div className="cand-role" style={{ color: 'var(--text-3)' }}>No role assigned</div>
+                        </div>
+                      </div>
+                      <div className="cand-bottom">
+                        <span className="source-tag">{c.source}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{daysAgo(c.created_at)}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           {activeStages.map(stage => {
             const stageCards = cards.filter(x => x.stage === stage)
             return (
