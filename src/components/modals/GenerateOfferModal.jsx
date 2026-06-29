@@ -11,6 +11,7 @@ export default function GenerateOfferModal({ onClose }) {
   const [managerTitle, setManagerTitle] = useState('')
   const [commissionAmount, setCommissionAmount] = useState('')
   const [offerExpiration, setOfferExpiration] = useState('')
+  const [annualBonus, setAnnualBonus] = useState('')
   const [templateId, setTemplateId] = useState(offerTemplates[0]?.id || '')
   const [sending, setSending] = useState(false)
   const [previewing, setPreviewing] = useState(false)
@@ -37,7 +38,7 @@ export default function GenerateOfferModal({ onClose }) {
     try {
       const signerName = selectedCandidate ? `${selectedCandidate.fname} ${selectedCandidate.lname}` : 'Candidate'
       const { documentBase64, documentName } = await previewOffer({
-        templateId, salary, startDate, role, managerTitle, commissionAmount, offerExpiration, signerName,
+        templateId, salary, startDate, role, managerTitle, commissionAmount, offerExpiration, annualBonus, signerName,
       })
       // Trigger browser download of the filled document
       const binary = atob(documentBase64)
@@ -88,6 +89,7 @@ export default function GenerateOfferModal({ onClose }) {
         managerTitle,
         commissionAmount,
         offerExpiration,
+        annualBonus,
       })
 
       onClose()
@@ -162,6 +164,13 @@ export default function GenerateOfferModal({ onClose }) {
               <label className="form-label">Commission amount</label>
               <input className="form-input" value={commissionAmount} onChange={e => setCommissionAmount(e.target.value)} placeholder="e.g. $10,000 or N/A" />
             </div>
+          </div>
+          <div className="form-grid">
+            <div className="form-row">
+              <label className="form-label">Annual bonus</label>
+              <input className="form-input" value={annualBonus} onChange={e => setAnnualBonus(e.target.value)} placeholder="e.g. $5,000 or N/A" />
+            </div>
+            <div className="form-row" />
           </div>
 
           {selectedCandidate && (

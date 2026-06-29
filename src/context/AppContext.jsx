@@ -252,8 +252,9 @@ export function AppProvider({ children, user }) {
     await supabase.from('offer_templates').delete().eq('id', templateId)
   }
 
-  function buildSubstitutions({ signerName, role, salary, startDate, managerTitle, commissionAmount, offerExpiration }) {
+  function buildSubstitutions({ signerName, role, salary, startDate, managerTitle, commissionAmount, offerExpiration, annualBonus }) {
     const fmt = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''
+    const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     return {
       'job_title': role || '',
       'salary_amount': salary || '',
@@ -261,10 +262,12 @@ export function AppProvider({ children, user }) {
       'custom_manager_title': managerTitle || '',
       'custom_commission_amount': commissionAmount || '',
       'offer_expiration_date': offerExpiration ? fmt(offerExpiration) : '',
+      'today_date': today,
+      'offered_annual_bonus': annualBonus || '',
     }
   }
 
-  async function previewOffer({ templateId, salary, startDate, role, managerTitle, commissionAmount, offerExpiration, signerName }) {
+  async function previewOffer({ templateId, salary, startDate, role, managerTitle, commissionAmount, offerExpiration, annualBonus, signerName }) {
     const template = offerTemplates.find(t => t.id === templateId)
     if (!template) throw new Error('Template not found')
     const { data: fileData, error: dlError } = await supabase.storage.from('offer-templates').download(template.file_path)
@@ -286,7 +289,7 @@ export function AppProvider({ children, user }) {
     return { documentBase64: data.documentBase64, documentName: data.documentName }
   }
 
-  async function sendOfferViaDocuSign(offerId, { signerEmail, signerName, templateId, salary, startDate, role, managerTitle, commissionAmount, offerExpiration }) {
+  async function sendOfferViaDocuSign(offerId, { signerEmail, signerName, templateId, salary, startDate, role, managerTitle, commissionAmount, offerExpiration, annualBonus }) {
     // 1. Download the template file from Supabase Storage
     const template = offerTemplates.find(t => t.id === templateId)
     if (!template) throw new Error('Template not found')
