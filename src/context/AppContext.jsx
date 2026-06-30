@@ -332,12 +332,12 @@ export function AppProvider({ children, user }) {
     if (data?.error) throw new Error(data.error)
 
     // 4. Update offer record with DocuSign envelope info
-    await supabase.from('offers').update({
+    const { error: updateError } = await supabase.from('offers').update({
       docusign_envelope_id: data.envelopeId,
       docusign_status: 'sent',
       sent_at: new Date().toISOString(),
-      template_id: templateId,
     }).eq('id', offerId)
+    if (updateError) throw new Error(`Offer sent but DB update failed: ${updateError.message}`)
 
     return data
   }
