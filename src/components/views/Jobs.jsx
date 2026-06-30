@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { PDFDocument } from 'pdf-lib'
 import { useApp, avColor, initials, stageStyle, STAGES, daysAgo } from '../../context/AppContext'
 import { supabase } from '../../lib/supabase'
 
@@ -10,6 +11,10 @@ export default function Jobs({ onNavigate }) {
   const [resumePreviewUrl, setResumePreviewUrl] = useState(null)
   const [resumePreviewName, setResumePreviewName] = useState('')
   const [resumeLoading, setResumeLoading] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState(new Set())
+  const [bundling, setBundling] = useState(false)
+  const [bundleWarning, setBundleWarning] = useState('')
 
   const selectedJob = jobs.find(j => j.id === selectedJobId)
 
@@ -20,6 +25,75 @@ export default function Jobs({ onNavigate }) {
     else setSelectedCandidateId(null)
     setNoteText('')
     setResumePreviewUrl(null)
+    setSelectMode(false)
+    setSelected(new Set())
+    setBundleWarning('')
+  }
+
+  function toggleSelectMode(applicants) {
+    setSelectMode(v => !v)
+    setSelected(new Set())
+    setBundleWarning('')
+  }
+
+  function toggleSelect(candidateId) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(candidateId)) next.delete(candidateId)
+      else next.add(candidateId)
+      return next
+    })
+  }
+
+  function selectAll(applicants) {
+    const allIds = applicants.map(c => c.id)
+    const allSelected = allIds.every(id => selected.has(id))
+    setSelected(allSelected ? new Set() : new Set(allIds))
+  }
+
+  async function handleBundleResumes(applicants) {
+    if (selected.size === 0) return
+    setBundling(true)
+    setBundleWarning('')
+    const selectedCandidates = applicants.filter(c => selected.has(c.id))
+    const withoutResume = selectedCandidates.filter(c => !c.resume_path)
+    const nonPdf = selectedCandidates.filter(c => c.resume_path && !c.resume_name?.toLowerCase().endsWith('.pdf'))
+    const pdfCandidates = selectedCandidates.filter(c => c.resume_path && c.resume_name?.toLowerCase().endsWith('.pdf'))
+    if (pdfCandidates.length === 0) {
+      setBundleWarning('None of the selected candidates have PDF resumes on file.')
+      setBundling(false)
+      return
+    }
+    try {
+      const merged = await PDFDocument.create()
+      for (const c of pdfCandidates) {
+        try {
+          const { data } = await supabase.storage.from('resumes').createSignedUrl(c.resume_path, 120)
+          if (!data?.signedUrl) continue
+          const res = await fetch(data.signedUrl)
+          const bytes = await res.arrayBuffer()
+          const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true })
+          const pages = await merged.copyPages(pdf, pdf.getPageIndices())
+          pages.forEach(p => merged.addPage(p))
+        } catch { /* skip individual failures */ }
+      }
+      const pdfBytes = await merged.save()
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${selectedJob.title.replace(/\s+/g, '-').toLowerCase()}-resumes-${new Date().toISOString().split('T')[0]}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      const warnings = []
+      if (withoutResume.length) warnings.push(`${withoutResume.length} had no resume on file.`)
+      if (nonPdf.length) warnings.push(`${nonPdf.length} had Word doc resumes (skipped).`)
+      if (warnings.length) setBundleWarning(warnings.join(' '))
+    } catch (err) {
+      setBundleWarning('Bundle failed: ' + err.message)
+    } finally {
+      setBundling(false)
+    }
   }
 
   async function handleViewResume(candidate) {
@@ -85,9 +159,23 @@ export default function Jobs({ onNavigate }) {
         <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16, alignItems: 'start' }}>
           {/* Applicant list */}
           <div className="section-card" style={{ marginBottom: 0 }}>
-            <div className="section-head" style={{ padding: '12px 14px' }}>
+            <div className="section-head" style={{ padding: '12px 14px', flexWrap: 'wrap', gap: 6 }}>
               <span className="section-title" style={{ fontSize: 13 }}>Applicants</span>
-              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{applicants.length} total</span>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{applicants.length} total</span>
+                <button
+                  className={`btn btn-sm${selectMode ? ' btn-primary' : ''}`}
+                  onClick={() => toggleSelectMode(applicants)}
+                  style={{ fontSize: 11 }}
+                >
+                  {selectMode ? `✓ ${selected.size}` : 'Select'}
+                </button>
+                {selectMode && (
+                  <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => selectAll(applicants)}>
+                    {applicants.every(c => selected.has(c.id)) ? 'Deselect all' : 'Select all'}
+                  </button>
+                )}
+              </div>
             </div>
             <div style={{ maxHeight: 520, overflowY: 'auto' }}>
               {applicants.length === 0 && (
@@ -107,9 +195,15 @@ export default function Jobs({ onNavigate }) {
                       return (
                         <div
                           key={c.id}
-                          onClick={() => { setSelectedCandidateId(c.id); setNoteText(''); setResumePreviewUrl(null) }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: isSelected ? 'var(--accent-bg)' : 'transparent', transition: 'background 0.1s' }}
+                          onClick={() => {
+                            if (selectMode) { toggleSelect(c.id); return }
+                            setSelectedCandidateId(c.id); setNoteText(''); setResumePreviewUrl(null)
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: isSelected ? 'var(--accent-bg)' : 'transparent', transition: 'background 0.1s', outline: selectMode && selected.has(c.id) ? '2px solid var(--accent)' : 'none', outlineOffset: -2 }}
                         >
+                          {selectMode && (
+                            <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} onClick={e => e.stopPropagation()} />
+                          )}
                           <div className="avatar" style={{ width: 30, height: 30, fontSize: 11, background: a.bg, color: a.color }}>{initials(c.fname, c.lname)}</div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.fname} {c.lname}</div>
@@ -246,6 +340,18 @@ export default function Jobs({ onNavigate }) {
             )}
           </div>
         </div>
+
+        {/* Floating bundle bar */}
+        {selectMode && selected.size > 0 && (
+          <div style={{ position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 4px 24px rgba(0,0,0,0.12)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 14, zIndex: 500, minWidth: 360 }}>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>{selected.size} candidate{selected.size !== 1 ? 's' : ''} selected</span>
+            <button className="btn btn-primary" onClick={() => handleBundleResumes(applicants)} disabled={bundling}>
+              {bundling ? 'Bundling…' : '📎 Bundle resumes'}
+            </button>
+            <button className="btn btn-sm" onClick={() => setSelected(new Set())}>Clear</button>
+            {bundleWarning && <span style={{ fontSize: 12, color: 'var(--text-3)', maxWidth: 240 }}>{bundleWarning}</span>}
+          </div>
+        )}
       </div>
     )
   }
