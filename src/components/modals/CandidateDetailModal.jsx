@@ -1,16 +1,80 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApp, avColor, initials, stageStyle, daysAgo, STAGES } from '../../context/AppContext'
 import { supabase } from '../../lib/supabase'
 
 export default function CandidateDetailModal({ candidateId, onClose }) {
-  const { candidates, jobs, offers, moveStage, addNote, openModal, downloadSignedOffer } = useApp()
+  const { candidates, jobs, offers, moveStage, addNote, openModal, downloadSignedOffer, user } = useApp()
   const [noteText, setNoteText] = useState('')
   const [noteRole, setNoteRole] = useState('General')
   const [resumePreviewUrl, setResumePreviewUrl] = useState(null)
   const [resumeLoading, setResumeLoading] = useState(false)
   const [offerPreviewUrl, setOfferPreviewUrl] = useState(null)
   const [offerPreviewName, setOfferPreviewName] = useState('')
-  const [offerPreviewLoading, setOfferPreviewLoading] = useState(null) // offer id being loaded
+  const [offerPreviewLoading, setOfferPreviewLoading] = useState(null)
+
+  // References
+  const [references, setReferences] = useState([])
+  const [refLoading, setRefLoading] = useState(false)
+  const [refUploading, setRefUploading] = useState(false)
+  const [refPreviewUrl, setRefPreviewUrl] = useState(null)
+  const [refPreviewName, setRefPreviewName] = useState('')
+  const [refPreviewLoading, setRefPreviewLoading] = useState(null)
+  const refInputRef = useRef()
+
+  useEffect(() => {
+    async function loadRefs() {
+      setRefLoading(true)
+      const { data } = await supabase
+        .from('candidate_references')
+        .select('*')
+        .eq('candidate_id', candidateId)
+        .order('created_at', { ascending: false })
+      setReferences(data || [])
+      setRefLoading(false)
+    }
+    loadRefs()
+  }, [candidateId])
+
+  async function handleUploadReference(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setRefUploading(true)
+    try {
+      const path = `references/${candidateId}/${Date.now()}-${file.name}`
+      const { error: uploadErr } = await supabase.storage.from('references').upload(path, file)
+      if (uploadErr) throw uploadErr
+      const { data, error } = await supabase.from('candidate_references').insert({
+        candidate_id: candidateId,
+        file_name: file.name,
+        file_path: path,
+        uploaded_by: user.id,
+      }).select().single()
+      if (error) throw error
+      setReferences(prev => [data, ...prev])
+    } catch (err) {
+      alert('Upload failed: ' + err.message)
+    } finally {
+      setRefUploading(false)
+      if (refInputRef.current) refInputRef.current.value = ''
+    }
+  }
+
+  async function handleViewReference(ref) {
+    setRefPreviewLoading(ref.id)
+    const { data } = await supabase.storage.from('references').createSignedUrl(ref.file_path, 300)
+    if (data?.signedUrl) {
+      setRefPreviewName(ref.file_name)
+      setRefPreviewUrl(data.signedUrl)
+    }
+    setRefPreviewLoading(null)
+  }
+
+  async function handleDeleteReference(ref) {
+    if (!confirm(`Delete "${ref.file_name}"?`)) return
+    await supabase.storage.from('references').remove([ref.file_path])
+    await supabase.from('candidate_references').delete().eq('id', ref.id)
+    setReferences(prev => prev.filter(r => r.id !== ref.id))
+  }
 
   const c = candidates.find(x => x.id === candidateId)
   if (!c) return null
@@ -188,6 +252,49 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
 
               {/* Right column */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                {/* References */}
+                <div className="detail-card">
+                  <div className="detail-card-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    References
+                    <label style={{ cursor: 'pointer' }}>
+                      <input
+                        ref={refInputRef}
+                        type="file"
+                        accept=".pdf"
+                        style={{ display: 'none' }}
+                        onChange={handleUploadReference}
+                        disabled={refUploading}
+                      />
+                      <span className="btn btn-sm">{refUploading ? 'Uploading…' : '+ Upload PDF'}</span>
+                    </label>
+                  </div>
+                  {refLoading && <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Loading…</div>}
+                  {!refLoading && references.length === 0 && (
+                    <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No references uploaded yet.</div>
+                  )}
+                  {references.map(ref => (
+                    <div key={ref.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        📎 {ref.file_name}
+                      </div>
+                      <button
+                        className="btn btn-sm"
+                        disabled={refPreviewLoading === ref.id}
+                        onClick={() => handleViewReference(ref)}
+                      >
+                        {refPreviewLoading === ref.id ? '…' : 'View'}
+                      </button>
+                      <button
+                        className="btn btn-sm btn-danger"
+                        onClick={() => handleDeleteReference(ref)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
                 {/* Add note */}
                 <div className="detail-card">
                   <div className="detail-card-title">Add note</div>
@@ -215,6 +322,22 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
           </div>
         </div>
       </div>
+
+      {/* Reference PDF preview overlay */}
+      {refPreviewUrl && (
+        <div className="modal-backdrop open" style={{ zIndex: 1100 }} onClick={e => { if (e.target === e.currentTarget) setRefPreviewUrl(null) }}>
+          <div className="modal" style={{ width: '80vw', height: '90vh', display: 'flex', flexDirection: 'column', padding: 0 }}>
+            <div className="modal-head" style={{ padding: '12px 20px' }}>
+              <div className="modal-title">{refPreviewName}</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a href={refPreviewUrl} download={refPreviewName} className="btn btn-sm">↓ Download</a>
+                <button className="modal-close" onClick={() => setRefPreviewUrl(null)}>×</button>
+              </div>
+            </div>
+            <iframe src={refPreviewUrl} style={{ flex: 1, border: 'none', width: '100%' }} title="Reference preview" />
+          </div>
+        </div>
+      )}
 
       {/* Signed offer PDF preview overlay */}
       {offerPreviewUrl && (
