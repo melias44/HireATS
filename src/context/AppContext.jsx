@@ -56,6 +56,7 @@ export function AppProvider({ children, user }) {
   const [offers, setOffers] = useState([])
   const [notes, setNotes] = useState([])
   const [offerTemplates, setOfferTemplates] = useState([])
+  const [team, setTeam] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)   // { name, props? }
 
@@ -70,6 +71,7 @@ export function AppProvider({ children, user }) {
       { data: interviewsData },
       { data: offersData },
       { data: templatesData },
+      { data: teamData },
     ] = await Promise.all([
       supabase.from('jobs').select('*').order('created_at', { ascending: false }),
       supabase.from('candidates').select('*').order('created_at', { ascending: false }),
@@ -78,7 +80,24 @@ export function AppProvider({ children, user }) {
       supabase.from('interviews').select('*').order('scheduled_at', { ascending: true }),
       supabase.from('offers').select('*').order('created_at', { ascending: false }),
       supabase.from('offer_templates').select('*').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('*').order('created_at', { ascending: true }),
     ])
+
+    // Bootstrap: if the current user has no profile yet, create them as admin (first user)
+    const myProfile = (teamData || []).find(p => p.id === user.id)
+    if (!myProfile) {
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        email: user.email,
+        full_name: user.user_metadata?.full_name || '',
+        role: 'admin',
+      }, { onConflict: 'id' })
+      // Re-fetch after upsert
+      const { data: refreshed } = await supabase.from('profiles').select('*').order('created_at', { ascending: true })
+      setTeam(refreshed || [])
+    } else {
+      setTeam(teamData || [])
+    }
 
     // Attach applications + notes to each candidate
     const enriched = (candidatesData || []).map(c => ({
@@ -94,6 +113,7 @@ export function AppProvider({ children, user }) {
     setNotes(notesData || [])
     setOfferTemplates(templatesData || [])
     setLoading(false)
+    // Note: team/profiles set above in bootstrap block
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
@@ -342,23 +362,55 @@ export function AppProvider({ children, user }) {
     return data
   }
 
+  async function inviteTeamMember(email, role, fullName) {
+    const { data, error } = await supabase.functions.invoke('invite-user', {
+      body: { email, role, fullName },
+    })
+    if (error) throw error
+    if (data?.error) throw new Error(data.error)
+    // Reload team list
+    const { data: refreshed } = await supabase.from('profiles').select('*').order('created_at', { ascending: true })
+    setTeam(refreshed || [])
+  }
+
+  async function updateTeamMemberRole(memberId, role) {
+    await supabase.from('profiles').update({ role }).eq('id', memberId)
+    setTeam(prev => prev.map(m => m.id === memberId ? { ...m, role } : m))
+  }
+
   const openModal = (name, props = {}) => setModal({ name, props })
   const closeModal = () => setModal(null)
 
   const activeJobs = jobs.filter(j => j.status === 'Active')
-  const activeCandidates = candidates.filter(c =>
-    c.applications?.some(a => a.stage !== 'Hired' && a.stage !== 'Rejected')
-  )
+  const myProfile = team.find(m => m.id === user.id)
+  const isAdmin = !myProfile || myProfile.role === 'admin'
+
+  const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0)
+  const activeCandidates = candidates.filter(c => {
+    const apps = c.applications || []
+    if (!apps.length) return false
+    // All rejected → out
+    if (apps.every(a => a.stage === 'Rejected')) return false
+    // Any in-flight application → keep
+    if (apps.some(a => a.stage !== 'Hired' && a.stage !== 'Rejected')) return true
+    // All remaining are Hired — keep until start date arrives
+    const offer = offers.find(o => o.candidate_id === c.id && o.start_date)
+    if (!offer?.start_date) return true // no start date set yet, keep in pipeline
+    const startDate = new Date(offer.start_date + 'T00:00:00')
+    return startDate >= todayMidnight
+  })
   const pendingOffers = offers.filter(o => o.status === 'Pending')
 
   return (
     <AppContext.Provider value={{
-      candidates, jobs, interviews, offers, notes, offerTemplates, loading,
+      candidates, jobs, interviews, offers, notes, offerTemplates, team, loading,
       activeJobs, activeCandidates, pendingOffers,
+      isAdmin,
       addCandidate, addJob, updateJobStatus, updateJobPublish,
       moveStage, addApplication, addNote,
       addInterview, addOffer, updateOfferStatus, updateOfferDocuSign,
       uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, previewOffer, downloadSignedOffer,
+      inviteTeamMember, updateTeamMemberRole,
       modal, openModal, closeModal,
       user, reload: loadAll,
     }}>

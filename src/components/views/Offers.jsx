@@ -2,11 +2,18 @@ import { useState, useRef } from 'react'
 import { useApp } from '../../context/AppContext'
 
 const DOCUSIGN_STATUS_LABELS = {
-  not_sent: { label: 'Not sent', bg: '#F1F5F9', color: '#475569' },
-  sent: { label: 'Sent for signature', bg: '#FFFBEB', color: '#92400E' },
-  completed: { label: 'Signed', bg: '#F0FDF4', color: '#15803D' },
-  declined: { label: 'Declined', bg: '#FEF2F2', color: '#991B1B' },
-  voided: { label: 'Voided', bg: '#F1F5F9', color: '#475569' },
+  not_sent:             { label: 'Not sent',           bg: '#F1F5F9', color: '#475569' },
+  sent:                 { label: 'Sent for signature', bg: '#FFFBEB', color: '#92400E' },
+  delivered:            { label: 'Opened',             bg: '#FFFBEB', color: '#92400E' },
+  completed:            { label: 'Signed',             bg: '#F0FDF4', color: '#15803D' },
+  'envelope-completed': { label: 'Signed',             bg: '#F0FDF4', color: '#15803D' },
+  declined:             { label: 'Declined',           bg: '#FEF2F2', color: '#991B1B' },
+  'envelope-declined':  { label: 'Declined',           bg: '#FEF2F2', color: '#991B1B' },
+  voided:               { label: 'Voided',             bg: '#F1F5F9', color: '#475569' },
+  'envelope-voided':    { label: 'Voided',             bg: '#F1F5F9', color: '#475569' },
+}
+function dsStatus(raw) {
+  return DOCUSIGN_STATUS_LABELS[raw] || DOCUSIGN_STATUS_LABELS['not_sent']
 }
 
 export default function Offers() {
@@ -121,7 +128,7 @@ export default function Offers() {
                 </thead>
                 <tbody>
                   {offers.map(o => {
-                    const ds = DOCUSIGN_STATUS_LABELS[o.docusign_status || 'not_sent']
+                    const ds = dsStatus(o.docusign_status)
                     return (
                       <tr key={o.id}>
                         <td><div style={{ fontWeight: 600 }}>{o.candidate_name}</div></td>
@@ -158,7 +165,7 @@ export default function Offers() {
                             >
                               Send via DocuSign
                             </button>
-                          ) : o.docusign_status !== 'completed' ? (
+                          ) : (o.docusign_status !== 'completed' && o.docusign_status !== 'envelope-completed') ? (
                             <button className="btn btn-sm" onClick={() => openSendModal(o)}>Resend</button>
                           ) : null}
                           {o.status === 'Pending' && (

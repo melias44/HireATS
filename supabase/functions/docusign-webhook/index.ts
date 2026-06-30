@@ -83,7 +83,9 @@ serve(async (req) => {
 
     // DocuSign Connect JSON payload structure
     const envelopeId = payload.data?.envelopeId
-    const status     = payload.data?.envelopeSummary?.status || payload.event
+    // Normalize status: envelopeSummary.status gives "completed"; payload.event gives "envelope-completed"
+    const rawStatus = payload.data?.envelopeSummary?.status || payload.event || ''
+    const status = rawStatus.startsWith('envelope-') ? rawStatus.replace('envelope-', '') : rawStatus
 
     if (!envelopeId) return new Response("ok", { status: 200 })
 

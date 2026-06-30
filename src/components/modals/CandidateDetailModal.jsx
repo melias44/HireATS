@@ -3,11 +3,14 @@ import { useApp, avColor, initials, stageStyle, daysAgo, STAGES } from '../../co
 import { supabase } from '../../lib/supabase'
 
 export default function CandidateDetailModal({ candidateId, onClose }) {
-  const { candidates, jobs, moveStage, addNote, openModal } = useApp()
+  const { candidates, jobs, offers, moveStage, addNote, openModal, downloadSignedOffer } = useApp()
   const [noteText, setNoteText] = useState('')
   const [noteRole, setNoteRole] = useState('General')
   const [resumePreviewUrl, setResumePreviewUrl] = useState(null)
   const [resumeLoading, setResumeLoading] = useState(false)
+  const [offerPreviewUrl, setOfferPreviewUrl] = useState(null)
+  const [offerPreviewName, setOfferPreviewName] = useState('')
+  const [offerPreviewLoading, setOfferPreviewLoading] = useState(null) // offer id being loaded
 
   const c = candidates.find(x => x.id === candidateId)
   if (!c) return null
@@ -16,6 +19,7 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
   const apps = c.applications || []
   const notes = c.notes || []
   const isPdf = c.resume_name?.toLowerCase().endsWith('.pdf')
+  const signedOffers = (offers || []).filter(o => o.candidate_id === c.id && o.signed_document_path)
 
   async function handleViewResume() {
     setResumeLoading(true)
@@ -30,6 +34,17 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
       }
     }
     setResumeLoading(false)
+  }
+
+  async function handleViewSignedOffer(offer) {
+    setOfferPreviewLoading(offer.id)
+    try {
+      const url = await downloadSignedOffer(offer.signed_document_path)
+      setOfferPreviewName(`Signed offer — ${offer.job_title}`)
+      setOfferPreviewUrl(url)
+    } finally {
+      setOfferPreviewLoading(null)
+    }
   }
 
   async function handleSaveNote() {
@@ -86,6 +101,18 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
                       </button>
                     </div>
                   )}
+                  {signedOffers.map(offer => (
+                    <div key={offer.id} style={{ marginTop: 8 }}>
+                      <button
+                        className="btn btn-sm"
+                        style={{ width: '100%', background: 'var(--green-bg, #F0FDF4)', color: 'var(--green-text, #15803D)', borderColor: '#BBF7D0' }}
+                        onClick={() => handleViewSignedOffer(offer)}
+                        disabled={offerPreviewLoading === offer.id}
+                      >
+                        {offerPreviewLoading === offer.id ? 'Loading…' : `📄 Signed offer — ${offer.job_title}`}
+                      </button>
+                    </div>
+                  ))}
                 </div>
 
                 {/* Experience summary */}
@@ -189,7 +216,27 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
         </div>
       </div>
 
-      {/* PDF preview overlay */}
+      {/* Signed offer PDF preview overlay */}
+      {offerPreviewUrl && (
+        <div
+          className="modal-backdrop open"
+          style={{ zIndex: 1100 }}
+          onClick={e => { if (e.target === e.currentTarget) setOfferPreviewUrl(null) }}
+        >
+          <div className="modal" style={{ width: '80vw', height: '90vh', display: 'flex', flexDirection: 'column', padding: 0 }}>
+            <div className="modal-head" style={{ padding: '12px 20px' }}>
+              <div className="modal-title">{offerPreviewName}</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a href={offerPreviewUrl} download className="btn btn-sm">↓ Download</a>
+                <button className="modal-close" onClick={() => setOfferPreviewUrl(null)}>×</button>
+              </div>
+            </div>
+            <iframe src={offerPreviewUrl} style={{ flex: 1, border: 'none', width: '100%' }} title="Signed offer preview" />
+          </div>
+        </div>
+      )}
+
+      {/* Resume PDF preview overlay */}
       {resumePreviewUrl && (
         <div
           className="modal-backdrop open"
