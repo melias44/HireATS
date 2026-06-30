@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { useApp, avColor, initials, stageStyle, STAGES, daysAgo } from '../../context/AppContext'
+import { supabase } from '../../lib/supabase'
 
 export default function Jobs({ onNavigate }) {
   const { jobs, candidates, openModal, updateJobStatus, moveStage, addNote, user } = useApp()
   const [selectedJobId, setSelectedJobId] = useState(null)
   const [selectedCandidateId, setSelectedCandidateId] = useState(null)
   const [noteText, setNoteText] = useState('')
+  const [resumePreviewUrl, setResumePreviewUrl] = useState(null)
+  const [resumePreviewName, setResumePreviewName] = useState('')
+  const [resumeLoading, setResumeLoading] = useState(false)
 
   const selectedJob = jobs.find(j => j.id === selectedJobId)
 
@@ -15,6 +19,23 @@ export default function Jobs({ onNavigate }) {
     if (applicants.length) setSelectedCandidateId(applicants[0].id)
     else setSelectedCandidateId(null)
     setNoteText('')
+    setResumePreviewUrl(null)
+  }
+
+  async function handleViewResume(candidate) {
+    if (!candidate.resume_path) return
+    setResumeLoading(true)
+    const isPdf = candidate.resume_name?.toLowerCase().endsWith('.pdf')
+    const { data } = await supabase.storage.from('resumes').createSignedUrl(candidate.resume_path, 300)
+    if (data?.signedUrl) {
+      if (isPdf) {
+        setResumePreviewName(candidate.resume_name)
+        setResumePreviewUrl(data.signedUrl)
+      } else {
+        window.open(`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(data.signedUrl)}`, '_blank')
+      }
+    }
+    setResumeLoading(false)
   }
 
   function closeJobDetail() {
@@ -86,7 +107,7 @@ export default function Jobs({ onNavigate }) {
                       return (
                         <div
                           key={c.id}
-                          onClick={() => { setSelectedCandidateId(c.id); setNoteText('') }}
+                          onClick={() => { setSelectedCandidateId(c.id); setNoteText(''); setResumePreviewUrl(null) }}
                           style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: isSelected ? 'var(--accent-bg)' : 'transparent', transition: 'background 0.1s' }}
                         >
                           <div className="avatar" style={{ width: 30, height: 30, fontSize: 11, background: a.bg, color: a.color }}>{initials(c.fname, c.lname)}</div>
@@ -124,7 +145,18 @@ export default function Jobs({ onNavigate }) {
                     <div style={{ fontSize: 16, fontWeight: 700 }}>{selectedCandidate.fname} {selectedCandidate.lname}</div>
                     <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{selectedCandidate.email || 'No email'} · {selectedCandidate.source}</div>
                   </div>
-                  <button className="btn btn-sm" onClick={() => openModal('candidateDetail', { candidateId: selectedCandidate.id })}>Full profile ↗</button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {selectedCandidate.resume_path && (
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => handleViewResume(selectedCandidate)}
+                        disabled={resumeLoading}
+                      >
+                        {resumeLoading ? 'Loading…' : '👁 Resume'}
+                      </button>
+                    )}
+                    <button className="btn btn-sm" onClick={() => openModal('candidateDetail', { candidateId: selectedCandidate.id })}>Full profile ↗</button>
+                  </div>
                 </div>
 
                 {/* Stage mover */}
@@ -177,7 +209,7 @@ export default function Jobs({ onNavigate }) {
                 </div>
 
                 {/* Add note */}
-                <div style={{ padding: '16px 20px' }}>
+                <div style={{ padding: '16px 20px', borderBottom: resumePreviewUrl ? '1px solid var(--border)' : 'none' }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Add note</div>
                   <textarea
                     className="note-input"
@@ -190,6 +222,26 @@ export default function Jobs({ onNavigate }) {
                     Save note
                   </button>
                 </div>
+
+                {/* Inline resume preview */}
+                {resumePreviewUrl && (
+                  <div style={{ padding: '0' }}>
+                    <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Resume — {resumePreviewName}
+                      </span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <a href={resumePreviewUrl} download={resumePreviewName} className="btn btn-sm">↓ Download</a>
+                        <button className="btn btn-sm" onClick={() => setResumePreviewUrl(null)}>✕ Close</button>
+                      </div>
+                    </div>
+                    <iframe
+                      src={resumePreviewUrl}
+                      style={{ width: '100%', height: 600, border: 'none', display: 'block' }}
+                      title="Resume preview"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
