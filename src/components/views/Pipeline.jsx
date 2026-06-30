@@ -48,10 +48,26 @@ export default function Pipeline() {
 
   const activeStages = STAGES.filter(s => s !== 'Rejected')
 
+  // All candidate IDs currently visible in the filtered view
+  const visibleCandidateIds = [
+    ...unassigned.map(c => c.id),
+    ...cards.map(x => x.candidateId),
+  ]
+  const allVisibleSelected = visibleCandidateIds.length > 0 &&
+    visibleCandidateIds.every(id => selected.has(id))
+
   function toggleSelectMode() {
     setSelectMode(v => !v)
     setSelected(new Set())
     setBundleWarning('')
+  }
+
+  function selectAllVisible() {
+    if (allVisibleSelected) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(visibleCandidateIds))
+    }
   }
 
   function toggleSelect(candidateId) {
@@ -150,6 +166,15 @@ export default function Pipeline() {
         >
           {selectMode ? `✓ Selecting (${selected.size})` : 'Select'}
         </button>
+        {selectMode && (
+          <button
+            className="btn btn-sm"
+            onClick={selectAllVisible}
+            style={{ whiteSpace: 'nowrap' }}
+          >
+            {allVisibleSelected ? 'Deselect all' : `Select all${roleFilter ? ` — ${roleFilter}` : ''}`}
+          </button>
+        )}
       </div>
 
       <div className="board-wrap">
