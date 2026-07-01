@@ -15,7 +15,7 @@ serve(async (req) => {
   try {
     const { email, role = "member", fullName = "" } = await req.json()
     if (!email) throw new Error("email is required")
-    if (!["admin", "member"].includes(role)) throw new Error("role must be admin or member")
+    if (!["admin", "member", "hiring_manager"].includes(role)) throw new Error("role must be admin, member, or hiring_manager")
 
     // Verify the calling user is authenticated
     const authHeader = req.headers.get("Authorization")

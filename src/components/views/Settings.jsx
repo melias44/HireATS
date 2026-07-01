@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
 
 const ROLE_STYLES = {
-  admin:  { bg: '#EEF4FF', color: '#1D4ED8', label: 'Admin' },
-  member: { bg: '#F1F5F9', color: '#475569', label: 'Member' },
+  admin:           { bg: '#EEF4FF', color: '#1D4ED8', label: 'Admin' },
+  member:          { bg: '#F1F5F9', color: '#475569', label: 'Member' },
+  hiring_manager:  { bg: '#FFF7ED', color: '#C2410C', label: 'Hiring Mgr' },
 }
 
 export default function Settings() {
@@ -78,6 +79,7 @@ export default function Settings() {
                           >
                             <option value="admin">Admin</option>
                             <option value="member">Member</option>
+                            <option value="hiring_manager">Hiring Manager</option>
                           </select>
                         )}
                       </td>
@@ -131,20 +133,22 @@ export default function Settings() {
             </div>
             <div className="form-row" style={{ marginTop: 12 }}>
               <label className="form-label">Role</label>
-              <div style={{ display: 'flex', gap: 10 }}>
-                {['admin', 'member'].map(r => (
-                  <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { value: 'admin',          label: 'Admin',           desc: '— full access, can invite others' },
+                  { value: 'member',         label: 'Member',          desc: '— full access, cannot manage team' },
+                  { value: 'hiring_manager', label: 'Hiring Manager',  desc: '— sees only their assigned job and its candidates' },
+                ].map(r => (
+                  <label key={r.value} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
                     <input
                       type="radio"
                       name="role"
-                      value={r}
-                      checked={inviteRole === r}
-                      onChange={() => setInviteRole(r)}
+                      value={r.value}
+                      checked={inviteRole === r.value}
+                      onChange={() => setInviteRole(r.value)}
                     />
-                    <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>{r}</span>
-                    <span style={{ color: 'var(--text-3)' }}>
-                      {r === 'admin' ? '— full access, can invite others' : '— full access, cannot manage team'}
-                    </span>
+                    <span style={{ fontWeight: 600 }}>{r.label}</span>
+                    <span style={{ color: 'var(--text-3)' }}>{r.desc}</span>
                   </label>
                 ))}
               </div>

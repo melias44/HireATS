@@ -4,7 +4,7 @@ import { useApp, avColor, initials, stageStyle, STAGES, daysAgo } from '../../co
 import { supabase } from '../../lib/supabase'
 
 export default function Jobs({ onNavigate }) {
-  const { jobs, candidates, openModal, updateJobStatus, moveStage, addNote, user } = useApp()
+  const { jobs, candidates, openModal, updateJobStatus, moveStage, addNote, user, team, isAdmin, updateJobHiringManager } = useApp()
   const [selectedJobId, setSelectedJobId] = useState(null)
   const [selectedCandidateId, setSelectedCandidateId] = useState(null)
   const [noteText, setNoteText] = useState('')
@@ -137,10 +137,28 @@ export default function Jobs({ onNavigate }) {
 
     return (
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
           <button className="btn btn-sm" onClick={closeJobDetail}>← Back to postings</button>
           <div style={{ fontSize: 16, fontWeight: 600 }}>{selectedJob.title}</div>
           <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{selectedJob.dept} · {selectedJob.location} · {selectedJob.salary}</div>
+          {/* Hiring manager display / assignment */}
+          {isAdmin ? (
+            <select
+              className="stage-select"
+              style={{ fontSize: 12 }}
+              value={selectedJob.hiring_manager_id || ''}
+              onChange={e => updateJobHiringManager(selectedJob.id, e.target.value)}
+            >
+              <option value="">👤 Assign hiring manager</option>
+              {team.map(m => (
+                <option key={m.id} value={m.id}>{m.full_name || m.email}</option>
+              ))}
+            </select>
+          ) : selectedJob.hiring_manager_id ? (
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+              👤 {team.find(m => m.id === selectedJob.hiring_manager_id)?.full_name || 'Hiring manager assigned'}
+            </span>
+          ) : null}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <button className="btn btn-sm" onClick={() => openModal('publishJob', { jobId: selectedJob.id })}>Publish</button>
             <button className="btn btn-sm" onClick={() => updateJobStatus(selectedJob.id, selectedJob.status === 'Active' ? 'Paused' : 'Active')}>

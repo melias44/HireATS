@@ -3,17 +3,21 @@ import { useApp } from '../../context/AppContext'
 import { callAI } from '../../lib/supabase'
 
 export default function AddJobModal({ onClose, onCreated }) {
-  const { addJob } = useApp()
+  const { addJob, team } = useApp()
   const [title, setTitle] = useState('')
   const [dept, setDept] = useState('Engineering')
   const [location, setLocation] = useState('')
   const [empType, setEmpType] = useState('Full-time')
   const [salary, setSalary] = useState('')
   const [description, setDescription] = useState('')
+  const [hiringManagerId, setHiringManagerId] = useState('')
   const [saving, setSaving] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiText, setAiText] = useState('')
   const [error, setError] = useState('')
+
+  // Show all team members as potential hiring managers
+  const hiringManagers = team
 
   async function handleGenerate() {
     if (!title) { setError('Enter a job title first.'); return }
@@ -37,7 +41,7 @@ export default function AddJobModal({ onClose, onCreated }) {
     setSaving(true)
     setError('')
     try {
-      const job = await addJob({ title, dept, location: location || 'Remote', employment_type: empType, salary: salary || 'TBD', description })
+      const job = await addJob({ title, dept, location: location || 'Remote', employment_type: empType, salary: salary || 'TBD', description, hiring_manager_id: hiringManagerId || null })
       onCreated?.(job.id)
       onClose()
     } catch (err) {
@@ -73,6 +77,15 @@ export default function AddJobModal({ onClose, onCreated }) {
               </select>
             </div>
             <div className="form-row"><label className="form-label">Salary range</label><input className="form-input" value={salary} onChange={e => setSalary(e.target.value)} placeholder="$120,000 – $150,000" /></div>
+          </div>
+          <div className="form-row">
+            <label className="form-label">Hiring manager <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(optional)</span></label>
+            <select className="form-input" value={hiringManagerId} onChange={e => setHiringManagerId(e.target.value)}>
+              <option value="">— None assigned —</option>
+              {hiringManagers.map(m => (
+                <option key={m.id} value={m.id}>{m.full_name || m.email}</option>
+              ))}
+            </select>
           </div>
           <div className="form-row"><label className="form-label">Job description</label><textarea className="form-input" style={{ minHeight: 100 }} value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe the role, responsibilities, and requirements…" /></div>
 

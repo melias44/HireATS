@@ -106,10 +106,27 @@ export function AppProvider({ children, user }) {
       notes: (notesData || []).filter(n => n.candidate_id === c.id),
     }))
 
-    setJobs(jobsData || [])
-    setCandidates(enriched)
-    setInterviews(interviewsData || [])
-    setOffers(offersData || [])
+    // For hiring managers, restrict to only their assigned jobs + related candidates
+    const resolvedProfile = (teamData || []).find(p => p.id === user.id) || (myProfile ? null : { role: 'admin' })
+    const isHM = resolvedProfile?.role === 'hiring_manager'
+
+    let filteredJobs = jobsData || []
+    let filteredCandidates = enriched
+    let filteredInterviews = interviewsData || []
+    let filteredOffers = offersData || []
+
+    if (isHM) {
+      filteredJobs = filteredJobs.filter(j => j.hiring_manager_id === user.id)
+      const hmJobIds = new Set(filteredJobs.map(j => j.id))
+      filteredCandidates = enriched.filter(c => c.applications?.some(a => hmJobIds.has(a.job_id)))
+      filteredInterviews = filteredInterviews.filter(i => hmJobIds.has(i.job_id))
+      filteredOffers = filteredOffers.filter(o => hmJobIds.has(o.job_id))
+    }
+
+    setJobs(filteredJobs)
+    setCandidates(filteredCandidates)
+    setInterviews(filteredInterviews)
+    setOffers(filteredOffers)
     setNotes(notesData || [])
     setOfferTemplates(templatesData || [])
     setLoading(false)
@@ -170,7 +187,7 @@ export function AppProvider({ children, user }) {
     return c
   }
 
-  async function addJob({ title, dept, location, employment_type, salary, description }) {
+  async function addJob({ title, dept, location, employment_type, salary, description, hiring_manager_id }) {
     const { data, error } = await supabase
       .from('jobs')
       .insert({
@@ -178,6 +195,7 @@ export function AppProvider({ children, user }) {
         status: 'Active',
         posted_at: new Date().toISOString(),
         created_by: user.id,
+        hiring_manager_id: hiring_manager_id || null,
       })
       .select()
       .single()
@@ -187,6 +205,10 @@ export function AppProvider({ children, user }) {
 
   async function updateJobStatus(jobId, status) {
     await supabase.from('jobs').update({ status }).eq('id', jobId)
+  }
+
+  async function updateJobHiringManager(jobId, hiringManagerId) {
+    await supabase.from('jobs').update({ hiring_manager_id: hiringManagerId || null }).eq('id', jobId)
   }
 
   async function updateJobPublish(jobId, fields) {
@@ -384,6 +406,7 @@ export function AppProvider({ children, user }) {
   const activeJobs = jobs.filter(j => j.status === 'Active')
   const myProfile = team.find(m => m.id === user.id)
   const isAdmin = !myProfile || myProfile.role === 'admin'
+  const isHiringManager = myProfile?.role === 'hiring_manager'
 
   const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0)
   const activeCandidates = candidates.filter(c => {
@@ -410,7 +433,7 @@ export function AppProvider({ children, user }) {
       moveStage, addApplication, addNote,
       addInterview, addOffer, updateOfferStatus, updateOfferDocuSign,
       uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, previewOffer, downloadSignedOffer,
-      inviteTeamMember, updateTeamMemberRole,
+      inviteTeamMember, updateTeamMemberRole, updateJobHiringManager,
       modal, openModal, closeModal,
       user, reload: loadAll,
     }}>
