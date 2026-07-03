@@ -95,8 +95,10 @@ No `Authorization` header needed — this endpoint is public.
 | `first_name` | string | ✅ | |
 | `last_name` | string | ✅ | |
 | `email` | string | ✅ | |
+| `work_authorized` | string | ✅ | `"yes"` or `"no"` — "Are you authorized to work in the US?" |
 | `phone` | string | | |
 | `linkedin_url` | string | | Full URL, e.g. `https://linkedin.com/in/…` |
+| `salary_expectations` | string | | Free text, e.g. `"$120,000 – $140,000"` |
 | `resume` | File | | PDF or Word (.pdf, .doc, .docx), max 10MB |
 
 **Success response (HTTP 200)**
@@ -128,12 +130,24 @@ Drop this into any page. Replace the `<form>` markup with your own design — th
 ```html
 <form id="apply-form" enctype="multipart/form-data">
   <input type="hidden" name="job_id" value="PASTE_JOB_ID_HERE" />
+
+  <!-- Contact info -->
   <input type="text"  name="first_name"   placeholder="First name"  required />
   <input type="text"  name="last_name"    placeholder="Last name"   required />
   <input type="email" name="email"        placeholder="Email"       required />
-  <input type="tel"   name="phone"        placeholder="Phone" />
+  <input type="tel"   name="phone"        placeholder="Phone (optional)" />
   <input type="url"   name="linkedin_url" placeholder="LinkedIn URL (optional)" />
   <input type="file"  name="resume"       accept=".pdf,.doc,.docx" />
+
+  <!-- Screening questions -->
+  <fieldset>
+    <legend>Are you authorized to work in the United States? *</legend>
+    <label><input type="radio" name="work_authorized" value="yes" required /> Yes</label>
+    <label><input type="radio" name="work_authorized" value="no"  required /> No</label>
+  </fieldset>
+
+  <input type="text" name="salary_expectations" placeholder="Salary expectations (e.g. $120,000 – $140,000)" />
+
   <button type="submit">Submit Application</button>
   <div id="apply-status"></div>
 </form>
@@ -185,6 +199,7 @@ Before this works end-to-end, run these steps once:
 **Step 1 — Run the SQL migration** in the Supabase SQL Editor (`tdtvactpmkzvnlufsosk`):
 
 ```sql
+-- From migration 008
 alter table candidates
   add column if not exists linkedin_url text;
 
@@ -199,6 +214,11 @@ create policy "Public can submit candidates"
 create policy "Public can submit applications"
   on applications for insert to anon
   with check (true);
+
+-- From migration 009
+alter table applications
+  add column if not exists work_authorized boolean,
+  add column if not exists salary_expectations text;
 ```
 
 **Step 2 — Deploy the Edge Function** from Terminal in the `hire-ats` project folder:

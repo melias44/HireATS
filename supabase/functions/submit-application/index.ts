@@ -35,9 +35,16 @@ serve(async (req) => {
     const firstName  = formData.get("first_name")?.toString()?.trim()
     const lastName   = formData.get("last_name")?.toString()?.trim()
     const email      = formData.get("email")?.toString()?.trim().toLowerCase()
-    const phone      = formData.get("phone")?.toString()?.trim() || null
-    const linkedin   = formData.get("linkedin_url")?.toString()?.trim() || null
-    const resumeFile = formData.get("resume") as File | null
+    const phone              = formData.get("phone")?.toString()?.trim() || null
+    const linkedin           = formData.get("linkedin_url")?.toString()?.trim() || null
+    const resumeFile         = formData.get("resume") as File | null
+    const workAuthRaw        = formData.get("work_authorized")?.toString()?.trim().toLowerCase()
+    const salaryExpectations = formData.get("salary_expectations")?.toString()?.trim() || null
+
+    // Convert work_authorized string to boolean (accepts "yes"/"no"/"true"/"false")
+    let workAuthorized: boolean | null = null
+    if (workAuthRaw === "yes" || workAuthRaw === "true") workAuthorized = true
+    else if (workAuthRaw === "no" || workAuthRaw === "false") workAuthorized = false
 
     // Validate required fields
     if (!jobId)     throw new Error("job_id is required")
@@ -45,6 +52,7 @@ serve(async (req) => {
     if (!lastName)  throw new Error("last_name is required")
     if (!email)     throw new Error("email is required")
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Invalid email address")
+    if (workAuthorized === null) throw new Error("Please indicate whether you are authorized to work in the US")
 
     // Use service role to bypass RLS for writes
     const supabase = createClient(
@@ -163,6 +171,8 @@ serve(async (req) => {
         job_id: jobId,
         stage: "Applied",
         applied_at: new Date().toISOString(),
+        work_authorized: workAuthorized,
+        salary_expectations: salaryExpectations,
       })
 
     if (appErr) throw new Error("Failed to create application: " + appErr.message)

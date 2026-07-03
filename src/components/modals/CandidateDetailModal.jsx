@@ -200,19 +200,41 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
                   {apps.map((app, i) => {
                     const job = jobs.find(j => j.id === app.job_id)
                     return (
-                      <div key={app.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < apps.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600 }}>{job?.title || app.role || '—'}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Applied {daysAgo(app.applied_at)}</div>
+                      <div key={app.id} style={{ padding: '10px 0', borderBottom: i < apps.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{job?.title || app.role || '—'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Applied {daysAgo(app.applied_at)}</div>
+                          </div>
+                          <select
+                            className="stage-select"
+                            style={{ width: 140, fontSize: 12 }}
+                            value={app.stage}
+                            onChange={e => moveStage(app.id, e.target.value)}
+                          >
+                            {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
                         </div>
-                        <select
-                          className="stage-select"
-                          style={{ width: 140, fontSize: 12 }}
-                          value={app.stage}
-                          onChange={e => moveStage(app.id, e.target.value)}
-                        >
-                          {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                        {/* Screening question answers */}
+                        {(app.work_authorized !== null && app.work_authorized !== undefined || app.salary_expectations) && (
+                          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {app.work_authorized !== null && app.work_authorized !== undefined && (
+                              <span style={{
+                                fontSize: 11, padding: '2px 8px', borderRadius: 20,
+                                background: app.work_authorized ? '#F0FDF4' : '#FEF2F2',
+                                color: app.work_authorized ? '#15803D' : '#991B1B',
+                                fontWeight: 600,
+                              }}>
+                                {app.work_authorized ? '✓ US work authorized' : '✗ Not US work authorized'}
+                              </span>
+                            )}
+                            {app.salary_expectations && (
+                              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)' }}>
+                                💰 {app.salary_expectations}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
