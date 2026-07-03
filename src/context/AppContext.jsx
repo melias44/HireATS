@@ -400,6 +400,43 @@ export function AppProvider({ children, user }) {
     setTeam(prev => prev.map(m => m.id === memberId ? { ...m, role } : m))
   }
 
+  async function mergeCandidates(keepId, discardId) {
+    const keep    = candidates.find(c => c.id === keepId)
+    const discard = candidates.find(c => c.id === discardId)
+    if (!keep || !discard) throw new Error('Candidates not found')
+
+    const keepJobIds = new Set((keep.applications || []).map(a => a.job_id))
+
+    // 1. Move applications that don't conflict; delete duplicates
+    for (const app of (discard.applications || [])) {
+      if (keepJobIds.has(app.job_id)) {
+        await supabase.from('applications').delete().eq('id', app.id)
+      } else {
+        await supabase.from('applications').update({ candidate_id: keepId }).eq('id', app.id)
+      }
+    }
+
+    // 2. Move notes, interviews, offers, references
+    await supabase.from('notes').update({ candidate_id: keepId }).eq('candidate_id', discardId)
+    await supabase.from('interviews').update({ candidate_id: keepId }).eq('candidate_id', discardId)
+    await supabase.from('offers').update({ candidate_id: keepId }).eq('candidate_id', discardId)
+    await supabase.from('candidate_references').update({ candidate_id: keepId }).eq('candidate_id', discardId)
+
+    // 3. Fill in any missing fields on the kept profile from the discarded one
+    const patch = {}
+    if (!keep.phone       && discard.phone)        patch.phone        = discard.phone
+    if (!keep.linkedin_url && discard.linkedin_url) patch.linkedin_url = discard.linkedin_url
+    if (!keep.resume_path  && discard.resume_path)  { patch.resume_path = discard.resume_path; patch.resume_name = discard.resume_name }
+    if (Object.keys(patch).length) {
+      await supabase.from('candidates').update(patch).eq('id', keepId)
+    }
+
+    // 4. Delete the discarded candidate
+    await supabase.from('candidates').delete().eq('id', discardId)
+
+    await loadAll()
+  }
+
   const openModal = (name, props = {}) => setModal({ name, props })
   const closeModal = () => setModal(null)
 
@@ -407,6 +444,29 @@ export function AppProvider({ children, user }) {
   const myProfile = team.find(m => m.id === user.id)
   const isAdmin = !myProfile || myProfile.role === 'admin'
   const isHiringManager = myProfile?.role === 'hiring_manager'
+
+  // Duplicate detection — pairs of candidates sharing email or phone
+  const duplicates = (() => {
+    const pairs = []
+    const pairSet = new Set()
+    for (let i = 0; i < candidates.length; i++) {
+      for (let j = i + 1; j < candidates.length; j++) {
+        const a = candidates[i]
+        const b = candidates[j]
+        const key = [a.id, b.id].sort().join('|')
+        if (pairSet.has(key)) continue
+        const emailMatch = a.email && b.email && a.email.toLowerCase() === b.email.toLowerCase()
+        const phoneMatch = a.phone && b.phone &&
+          a.phone.replace(/\D/g, '').length >= 7 &&
+          a.phone.replace(/\D/g, '') === b.phone.replace(/\D/g, '')
+        if (emailMatch || phoneMatch) {
+          pairSet.add(key)
+          pairs.push({ a, b, reason: emailMatch ? 'email' : 'phone' })
+        }
+      }
+    }
+    return pairs
+  })()
 
   const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0)
   const activeCandidates = candidates.filter(c => {
@@ -428,7 +488,8 @@ export function AppProvider({ children, user }) {
     <AppContext.Provider value={{
       candidates, jobs, interviews, offers, notes, offerTemplates, team, loading,
       activeJobs, activeCandidates, pendingOffers,
-      isAdmin,
+      isAdmin, isHiringManager,
+      duplicates, mergeCandidates,
       addCandidate, addJob, updateJobStatus, updateJobPublish,
       moveStage, addApplication, addNote,
       addInterview, addOffer, updateOfferStatus, updateOfferDocuSign,

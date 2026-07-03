@@ -4,7 +4,7 @@ import { useApp, avColor, initials, daysAgo, STAGES } from '../../context/AppCon
 import { supabase } from '../../lib/supabase'
 
 export default function Pipeline() {
-  const { candidates, jobs, openModal } = useApp()
+  const { candidates, jobs, openModal, duplicates } = useApp()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
   const [selectMode, setSelectMode] = useState(false)
@@ -143,6 +143,34 @@ export default function Pipeline() {
 
   return (
     <div>
+      {/* Duplicate alert banner */}
+      {duplicates.length > 0 && (
+        <div
+          onClick={() => openModal('mergeCandidates')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            background: '#FFFBEB', border: '1px solid #FDE68A',
+            borderRadius: 10, padding: '10px 16px', marginBottom: 14,
+            cursor: 'pointer', transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#FEF3C7'}
+          onMouseLeave={e => e.currentTarget.style.background = '#FFFBEB'}
+        >
+          <span style={{ fontSize: 18 }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#92400E' }}>
+              {duplicates.length} duplicate profile{duplicates.length !== 1 ? 's' : ''} detected
+            </span>
+            <span style={{ fontSize: 12, color: '#A16207', marginLeft: 8 }}>
+              — candidates sharing the same email or phone number
+            </span>
+          </div>
+          <button className="btn btn-sm" style={{ background: '#FDE68A', border: 'none', color: '#92400E', fontWeight: 600 }}>
+            Review &amp; merge →
+          </button>
+        </div>
+      )}
+
       <div className="search-bar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <input
           className="search-input"
