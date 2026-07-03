@@ -144,10 +144,10 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
                   <div className="info-row"><span className="info-key">Email</span><span className="info-val">{c.email || '—'}</span></div>
                   {c.phone && <div className="info-row"><span className="info-key">Phone</span><span className="info-val">{c.phone}</span></div>}
                   {c.location && <div className="info-row"><span className="info-key">Location</span><span className="info-val">{c.location}</span></div>}
-                  {c.linkedin && (
+                  {c.linkedin_url && (
                     <div className="info-row">
                       <span className="info-key">LinkedIn</span>
-                      <a className="info-val" href={c.linkedin.startsWith('http') ? c.linkedin : `https://${c.linkedin}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>View profile ↗</a>
+                      <a className="info-val" href={c.linkedin_url.startsWith('http') ? c.linkedin_url : `https://${c.linkedin_url}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>View profile ↗</a>
                     </div>
                   )}
                   <div className="info-row"><span className="info-key">Source</span><span className="info-val">{c.source}</span></div>
