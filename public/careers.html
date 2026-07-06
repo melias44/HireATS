@@ -465,11 +465,17 @@
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/jobs?status=eq.Active&select=id,title,dept,location,employment_type,salary,description,posted_at&order=posted_at.desc`,
-        { headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' } }
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' } }
       )
-      allJobs = await res.json()
-      if (!Array.isArray(allJobs)) allJobs = []
+      const data = await res.json()
+      if (!res.ok) {
+        console.error('Jobs fetch error:', data)
+        allJobs = []
+      } else {
+        allJobs = Array.isArray(data) ? data : []
+      }
     } catch (e) {
+      console.error('Jobs fetch exception:', e)
       allJobs = []
     }
     populateDeptFilter()
