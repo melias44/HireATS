@@ -221,8 +221,12 @@
       color: #444;
       line-height: 1.7;
       margin-bottom: 28px;
-      white-space: pre-wrap;
     }
+    .job-description ul, .job-description ol { padding-left: 20px; margin: 8px 0; }
+    .job-description li { margin: 4px 0; }
+    .job-description h2 { font-size: 16px; font-weight: 700; margin: 14px 0 6px; color: #111; }
+    .job-description h3 { font-size: 14px; font-weight: 700; margin: 12px 0 4px; color: #111; }
+    .job-description p  { margin: 6px 0; }
 
     .section-divider {
       font-size: 13px;
@@ -552,7 +556,7 @@
     `
     document.getElementById('drawer-body').innerHTML = `
       ${j.description ? `
-        <div class="job-description">${esc(j.description)}</div>
+        <div class="job-description">${j.description}</div>
         <div style="border-top:1px solid var(--bdg-border);margin-bottom:24px;"></div>
       ` : ''}
 

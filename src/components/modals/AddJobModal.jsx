@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { callAI } from '../../lib/supabase'
+import RichTextEditor, { plainToHtml } from '../RichTextEditor'
 
 const EEO_BOILERPLATE = `BDG Media Inc. is proud to be an equal opportunity workplace. All qualified applicants will receive consideration for employment without regard to, and will not be discriminated against based on age, race, gender, color, religion, national origin, sexual orientation, gender identity, veteran status, disability, or any other protected category.`
 
@@ -15,20 +16,9 @@ export default function AddJobModal({ onClose, onCreated }) {
   const [hiringManagerId, setHiringManagerId] = useState('')
   const [saving, setSaving] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
-  const [aiText, setAiText] = useState('')
   const [error, setError] = useState('')
 
-  // Show all team members as potential hiring managers
   const hiringManagers = team
-
-  // Auto-resize textarea as content grows
-  const descRef = useRef(null)
-  const handleDescChange = useCallback(e => {
-    setDescription(e.target.value)
-    const el = e.target
-    el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
-  }, [])
 
   async function handleGenerate() {
     if (!title) { setError('Enter a job title first.'); return }
@@ -38,15 +28,8 @@ export default function AddJobModal({ onClose, onCreated }) {
       const text = await callAI(
         `Write a concise, compelling job description for a ${title} role in the ${dept} department${salary ? ' with salary range ' + salary : ''}. Include: 2-3 sentence overview, 4-5 key responsibilities (bullet points), 4-5 requirements (bullet points). Keep it professional but human. No fluff.`
       )
-      setAiText(text)
-      setDescription(text)
-      // Resize textarea to fit generated content
-      setTimeout(() => {
-        if (descRef.current) {
-          descRef.current.style.height = 'auto'
-          descRef.current.style.height = descRef.current.scrollHeight + 'px'
-        }
-      }, 0)
+      // Convert plain text to HTML so the rich editor renders it properly
+      setDescription(plainToHtml(text))
     } catch (err) {
       setError('AI generation failed — make sure the Edge Function is deployed.')
     } finally {
@@ -59,10 +42,18 @@ export default function AddJobModal({ onClose, onCreated }) {
     setSaving(true)
     setError('')
     try {
+      // Append EEO boilerplate as plain paragraph after the HTML body
       const fullDescription = description
-        ? `${description.trimEnd()}\n\n${EEO_BOILERPLATE}`
-        : EEO_BOILERPLATE
-      const job = await addJob({ title, dept, location: location || 'Remote', employment_type: empType, salary: salary || 'TBD', description: fullDescription, hiring_manager_id: hiringManagerId || null })
+        ? `${description}<p style="margin-top:16px;font-size:13px;color:#666;">${EEO_BOILERPLATE}</p>`
+        : `<p>${EEO_BOILERPLATE}</p>`
+      const job = await addJob({
+        title, dept,
+        location: location || 'Remote',
+        employment_type: empType,
+        salary: salary || 'TBD',
+        description: fullDescription,
+        hiring_manager_id: hiringManagerId || null,
+      })
       onCreated?.(job.id)
       onClose()
     } catch (err) {
@@ -73,14 +64,23 @@ export default function AddJobModal({ onClose, onCreated }) {
 
   return (
     <div className="modal-backdrop open" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal">
+      <div className="modal" style={{ width: 640 }}>
         <div className="modal-head">
           <div><div className="modal-title">New job posting</div><div className="modal-sub">Create a new open role</div></div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
-          {error && <div style={{ background: 'var(--red-bg)', border: '1px solid #FCA5A5', borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 13, color: 'var(--red-text)', marginBottom: 14 }}>{error}</div>}
-          <div className="form-row"><label className="form-label">Job title</label><input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Senior Software Engineer" /></div>
+          {error && (
+            <div style={{ background: 'var(--red-bg)', border: '1px solid #FCA5A5', borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 13, color: 'var(--red-text)', marginBottom: 14 }}>
+              {error}
+            </div>
+          )}
+
+          <div className="form-row">
+            <label className="form-label">Job title</label>
+            <input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Senior Software Engineer" />
+          </div>
+
           <div className="form-grid">
             <div className="form-row">
               <label className="form-label">Department</label>
@@ -88,8 +88,12 @@ export default function AddJobModal({ onClose, onCreated }) {
                 {['Account Management', 'Brand Strategy', 'BDG', 'Bustle', 'Commerce', 'Design', 'Elite Daily', 'Engineering', 'Experiential', 'Fatherly', 'Finance', 'HR', 'Inverse', 'Legal', 'NYLON', 'Sales', 'Scary Mommy', 'Social Media', 'Talent', 'The Zoe Report', 'W'].map(d => <option key={d}>{d}</option>)}
               </select>
             </div>
-            <div className="form-row"><label className="form-label">Location</label><input className="form-input" value={location} onChange={e => setLocation(e.target.value)} placeholder="Remote / New York, NY" /></div>
+            <div className="form-row">
+              <label className="form-label">Location</label>
+              <input className="form-input" value={location} onChange={e => setLocation(e.target.value)} placeholder="Remote / New York, NY" />
+            </div>
           </div>
+
           <div className="form-grid">
             <div className="form-row">
               <label className="form-label">Employment type</label>
@@ -97,8 +101,12 @@ export default function AddJobModal({ onClose, onCreated }) {
                 {['Full-time', 'Part-time', 'Contract'].map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
-            <div className="form-row"><label className="form-label">Salary range</label><input className="form-input" value={salary} onChange={e => setSalary(e.target.value)} placeholder="$120,000 – $150,000" /></div>
+            <div className="form-row">
+              <label className="form-label">Salary range</label>
+              <input className="form-input" value={salary} onChange={e => setSalary(e.target.value)} placeholder="$120,000 – $150,000" />
+            </div>
           </div>
+
           <div className="form-row">
             <label className="form-label">Hiring manager <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(optional)</span></label>
             <select className="form-input" value={hiringManagerId} onChange={e => setHiringManagerId(e.target.value)}>
@@ -108,17 +116,20 @@ export default function AddJobModal({ onClose, onCreated }) {
               ))}
             </select>
           </div>
+
           <div className="form-row">
-            <label className="form-label">Job description</label>
-            <textarea
-              ref={descRef}
-              className="form-input"
-              style={{ minHeight: 140, resize: 'none', overflow: 'hidden', lineHeight: 1.6, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label className="form-label" style={{ margin: 0 }}>Job description</label>
+              <button className="btn btn-sm" onClick={handleGenerate} disabled={aiLoading}>
+                {aiLoading ? <span className="ai-loading"><span className="spinner" />Generating…</span> : '✨ Generate with AI'}
+              </button>
+            </div>
+            <RichTextEditor
               value={description}
-              onChange={handleDescChange}
+              onChange={setDescription}
               placeholder="Describe the role, responsibilities, and requirements…"
             />
-            {/* EEO boilerplate — always appended, not editable */}
+            {/* EEO boilerplate — locked, always appended on save */}
             <div style={{
               border: '1px solid var(--border)',
               borderTop: 'none',
@@ -133,21 +144,12 @@ export default function AddJobModal({ onClose, onCreated }) {
               gap: 8,
               alignItems: 'flex-start',
             }}>
-              <span style={{ fontSize: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px', whiteSpace: 'nowrap', marginTop: 1, flexShrink: 0, color: 'var(--text-3)', fontWeight: 600 }}>AUTO</span>
+              <span style={{ fontSize: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px', whiteSpace: 'nowrap', marginTop: 1, flexShrink: 0, fontWeight: 600 }}>AUTO</span>
               {EEO_BOILERPLATE}
             </div>
           </div>
-
-          {aiText && (
-            <div className="ai-panel">
-              <div className="ai-panel-head"><div className="ai-dot" />&nbsp;AI-generated description</div>
-              <div className="ai-output">{aiText}</div>
-            </div>
-          )}
-          <button className="btn btn-sm" onClick={handleGenerate} disabled={aiLoading} style={{ marginBottom: 4 }}>
-            {aiLoading ? <span className="ai-loading"><span className="spinner" />Generating…</span> : '✨ Generate description with AI'}
-          </button>
         </div>
+
         <div className="modal-footer">
           <button className="btn" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>{saving ? 'Saving…' : 'Post job'}</button>
