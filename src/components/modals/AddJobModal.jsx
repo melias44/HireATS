@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useApp } from '../../context/AppContext'
 import { callAI } from '../../lib/supabase'
 
@@ -19,6 +19,15 @@ export default function AddJobModal({ onClose, onCreated }) {
   // Show all team members as potential hiring managers
   const hiringManagers = team
 
+  // Auto-resize textarea as content grows
+  const descRef = useRef(null)
+  const handleDescChange = useCallback(e => {
+    setDescription(e.target.value)
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }, [])
+
   async function handleGenerate() {
     if (!title) { setError('Enter a job title first.'); return }
     setError('')
@@ -29,6 +38,13 @@ export default function AddJobModal({ onClose, onCreated }) {
       )
       setAiText(text)
       setDescription(text)
+      // Resize textarea to fit generated content
+      setTimeout(() => {
+        if (descRef.current) {
+          descRef.current.style.height = 'auto'
+          descRef.current.style.height = descRef.current.scrollHeight + 'px'
+        }
+      }, 0)
     } catch (err) {
       setError('AI generation failed — make sure the Edge Function is deployed.')
     } finally {
@@ -87,7 +103,17 @@ export default function AddJobModal({ onClose, onCreated }) {
               ))}
             </select>
           </div>
-          <div className="form-row"><label className="form-label">Job description</label><textarea className="form-input" style={{ minHeight: 100 }} value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe the role, responsibilities, and requirements…" /></div>
+          <div className="form-row">
+            <label className="form-label">Job description</label>
+            <textarea
+              ref={descRef}
+              className="form-input"
+              style={{ minHeight: 140, resize: 'none', overflow: 'hidden', lineHeight: 1.6 }}
+              value={description}
+              onChange={handleDescChange}
+              placeholder="Describe the role, responsibilities, and requirements…"
+            />
+          </div>
 
           {aiText && (
             <div className="ai-panel">
