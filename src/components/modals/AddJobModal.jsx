@@ -2,6 +2,8 @@ import { useState, useRef, useCallback } from 'react'
 import { useApp } from '../../context/AppContext'
 import { callAI } from '../../lib/supabase'
 
+const EEO_BOILERPLATE = `BDG Media Inc. is proud to be an equal opportunity workplace. All qualified applicants will receive consideration for employment without regard to, and will not be discriminated against based on age, race, gender, color, religion, national origin, sexual orientation, gender identity, veteran status, disability, or any other protected category.`
+
 export default function AddJobModal({ onClose, onCreated }) {
   const { addJob, team } = useApp()
   const [title, setTitle] = useState('')
@@ -57,7 +59,10 @@ export default function AddJobModal({ onClose, onCreated }) {
     setSaving(true)
     setError('')
     try {
-      const job = await addJob({ title, dept, location: location || 'Remote', employment_type: empType, salary: salary || 'TBD', description, hiring_manager_id: hiringManagerId || null })
+      const fullDescription = description
+        ? `${description.trimEnd()}\n\n${EEO_BOILERPLATE}`
+        : EEO_BOILERPLATE
+      const job = await addJob({ title, dept, location: location || 'Remote', employment_type: empType, salary: salary || 'TBD', description: fullDescription, hiring_manager_id: hiringManagerId || null })
       onCreated?.(job.id)
       onClose()
     } catch (err) {
@@ -108,11 +113,29 @@ export default function AddJobModal({ onClose, onCreated }) {
             <textarea
               ref={descRef}
               className="form-input"
-              style={{ minHeight: 140, resize: 'none', overflow: 'hidden', lineHeight: 1.6 }}
+              style={{ minHeight: 140, resize: 'none', overflow: 'hidden', lineHeight: 1.6, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
               value={description}
               onChange={handleDescChange}
               placeholder="Describe the role, responsibilities, and requirements…"
             />
+            {/* EEO boilerplate — always appended, not editable */}
+            <div style={{
+              border: '1px solid var(--border)',
+              borderTop: 'none',
+              borderBottomLeftRadius: 'var(--radius)',
+              borderBottomRightRadius: 'var(--radius)',
+              padding: '10px 12px',
+              background: 'var(--bg)',
+              fontSize: 12,
+              color: 'var(--text-3)',
+              lineHeight: 1.5,
+              display: 'flex',
+              gap: 8,
+              alignItems: 'flex-start',
+            }}>
+              <span style={{ fontSize: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px', whiteSpace: 'nowrap', marginTop: 1, flexShrink: 0, color: 'var(--text-3)', fontWeight: 600 }}>AUTO</span>
+              {EEO_BOILERPLATE}
+            </div>
           </div>
 
           {aiText && (
