@@ -379,7 +379,18 @@ export default function Jobs({ onNavigate }) {
     <div className="section-card">
       <div className="section-head">
         <span className="section-title">All job postings</span>
-        <button className="btn btn-sm btn-primary" onClick={() => openModal('addJob')}>+ New posting</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <a
+            href="/careers.html"
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-sm"
+            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}
+          >
+            🌐 Preview careers page
+          </a>
+          <button className="btn btn-sm btn-primary" onClick={() => openModal('addJob')}>+ New posting</button>
+        </div>
       </div>
       <div className="table-wrap">
         {jobs.length === 0 ? (
