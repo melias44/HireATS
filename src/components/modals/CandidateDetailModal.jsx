@@ -413,3 +413,433 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
     </>
   )
 }
+import { useState, useEffect, useRef } from 'react'
+import { useApp, avColor, initials, stageStyle, daysAgo, STAGES } from '../../context/AppContext'
+import { supabase } from '../../lib/supabase'
+
+export default function CandidateDetailModal({ candidateId, onClose }) {
+  const { candidates, jobs, offers, moveStage, updateJobStatus, addNote, openModal, downloadSignedOffer, user } = useApp()
+  const [noteText, setNoteText] = useState('')
+  const [noteRole, setNoteRole] = useState('General')
+  const [resumePreviewUrl, setResumePreviewUrl] = useState(null)
+  const [resumeLoading, setResumeLoading] = useState(false)
+  const [offerPreviewUrl, setOfferPreviewUrl] = useState(null)
+  const [offerPreviewName, setOfferPreviewName] = useState('')
+  const [offerPreviewLoading, setOfferPreviewLoading] = useState(null)
+
+  // References
+  const [references, setReferences] = useState([])
+  const [refLoading, setRefLoading] = useState(false)
+  const [refUploading, setRefUploading] = useState(false)
+  const [refPreviewUrl, setRefPreviewUrl] = useState(null)
+  const [refPreviewName, setRefPreviewName] = useState('')
+  const [refPreviewLoading, setRefPreviewLoading] = useState(null)
+  const refInputRef = useRef()
+
+  useEffect(() => {
+    async function loadRefs() {
+      setRefLoading(true)
+      const { data } = await supabase
+        .from('candidate_references')
+        .select('*')
+        .eq('candidate_id', candidateId)
+        .order('created_at', { ascending: false })
+      setReferences(data || [])
+      setRefLoading(false)
+    }
+    loadRefs()
+  }, [candidateId])
+
+  async function handleUploadReference(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setRefUploading(true)
+    try {
+      const path = `references/${candidateId}/${Date.now()}-${file.name}`
+      const { error: uploadErr } = await supabase.storage.from('references').upload(path, file)
+      if (uploadErr) throw uploadErr
+      const { data, error } = await supabase.from('candidate_references').insert({
+        candidate_id: candidateId,
+        file_name: file.name,
+        file_path: path,
+        uploaded_by: user.id,
+      }).select().single()
+      if (error) throw error
+      setReferences(prev => [data, ...prev])
+    } catch (err) {
+      alert('Upload failed: ' + err.message)
+    } finally {
+      setRefUploading(false)
+      if (refInputRef.current) refInputRef.current.value = ''
+    }
+  }
+
+  async function handleViewReference(ref) {
+    setRefPreviewLoading(ref.id)
+    const { data } = await supabase.storage.from('references').createSignedUrl(ref.file_path, 300)
+    if (data?.signedUrl) {
+      setRefPreviewName(ref.file_name)
+      setRefPreviewUrl(data.signedUrl)
+    }
+    setRefPreviewLoading(null)
+  }
+
+  async function handleDeleteReference(ref) {
+    if (!confirm(`Delete "${ref.file_name}"?`)) return
+    await supabase.storage.from('references').remove([ref.file_path])
+    await supabase.from('candidate_references').delete().eq('id', ref.id)
+    setReferences(prev => prev.filter(r => r.id !== ref.id))
+  }
+
+  const c = candidates.find(x => x.id === candidateId)
+  if (!c) return null
+
+  const av = avColor(c.fname)
+  const apps = c.applications || []
+  const notes = c.notes || []
+  const isPdf = c.resume_name?.toLowerCase().endsWith('.pdf')
+  const signedOffers = (offers || []).filter(o => o.candidate_id === c.id && o.signed_document_path)
+
+  async function handleViewResume() {
+    setResumeLoading(true)
+    const { data } = await supabase.storage.from('resumes').createSignedUrl(c.resume_path, 300)
+    if (data?.signedUrl) {
+      if (isPdf) {
+        setResumePreviewUrl(data.signedUrl)
+      } else {
+        // Word doc — open in Microsoft Office Online viewer
+        const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(data.signedUrl)}`
+        window.open(viewerUrl, '_blank')
+      }
+    }
+    setResumeLoading(false)
+  }
+
+  async function handleViewSignedOffer(offer) {
+    setOfferPreviewLoading(offer.id)
+    try {
+      const url = await downloadSignedOffer(offer.signed_document_path)
+      setOfferPreviewName(`Signed offer — ${offer.job_title}`)
+      setOfferPreviewUrl(url)
+    } finally {
+      setOfferPreviewLoading(null)
+    }
+  }
+
+  async function handleStageChange(app, newStage) {
+    if (newStage === 'Hired') {
+      const job = jobs.find(j => j.id === app.job_id)
+      const jobTitle = job?.title || 'this role'
+      const confirmed = window.confirm(
+        `Moving to Hired will unpublish "${jobTitle}" from the careers page. Continue?`
+      )
+      if (!confirmed) return
+      await moveStage(app.id, 'Hired')
+      if (job) await updateJobStatus(job.id, 'Closed')
+    } else {
+      await moveStage(app.id, newStage)
+    }
+  }
+
+  async function handleSaveNote() {
+    if (!noteText.trim()) return
+    await addNote(c.id, noteText.trim(), noteRole)
+    setNoteText('')
+  }
+
+  return (
+    <>
+      <div className="modal-backdrop open" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+        <div className="modal" style={{ width: 740, maxHeight: '88vh' }}>
+          <div className="modal-head">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div className="avatar" style={{ width: 44, height: 44, fontSize: 15, background: av.bg, color: av.color }}>
+                {initials(c.fname, c.lname)}
+              </div>
+              <div>
+                <div className="modal-title">{c.fname} {c.lname}</div>
+                <div className="modal-sub">{c.source} · {apps.length} application{apps.length !== 1 ? 's' : ''}</div>
+              </div>
+            </div>
+            <button className="modal-close" onClick={onClose}>×</button>
+          </div>
+
+          <div className="modal-body">
+            <div className="detail-grid">
+              {/* Left column */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Contact */}
+                <div className="detail-card">
+                  <div className="detail-card-title">Contact info</div>
+                  <div className="info-row"><span className="info-key">Email</span><span className="info-val">{c.email || '—'}</span></div>
+                  {c.phone && <div className="info-row"><span className="info-key">Phone</span><span className="info-val">{c.phone}</span></div>}
+                  {c.location && <div className="info-row"><span className="info-key">Location</span><span className="info-val">{c.location}</span></div>}
+                  {c.linkedin_url && (
+                    <div className="info-row">
+                      <span className="info-key">LinkedIn</span>
+                      <a className="info-val" href={c.linkedin_url.startsWith('http') ? c.linkedin_url : `https://${c.linkedin_url}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>View profile ↗</a>
+                    </div>
+                  )}
+                  <div className="info-row"><span className="info-key">Source</span><span className="info-val">{c.source}</span></div>
+                  <div className="info-row"><span className="info-key">Added</span><span className="info-val">{daysAgo(c.created_at)}</span></div>
+                  <div className="info-row"><span className="info-key">Applications</span><span className="info-val">{apps.length}</span></div>
+                  {c.resume_path && (
+                    <div style={{ marginTop: 10 }}>
+                      <button
+                        className="btn btn-sm"
+                        style={{ width: '100%' }}
+                        onClick={handleViewResume}
+                        disabled={resumeLoading}
+                      >
+                        {resumeLoading ? 'Loading…' : `👁 View resume`}
+                      </button>
+                    </div>
+                  )}
+                  {signedOffers.map(offer => (
+                    <div key={offer.id} style={{ marginTop: 8 }}>
+                      <button
+                        className="btn btn-sm"
+                        style={{ width: '100%', background: 'var(--green-bg, #F0FDF4)', color: 'var(--green-text, #15803D)', borderColor: '#BBF7D0' }}
+                        onClick={() => handleViewSignedOffer(offer)}
+                        disabled={offerPreviewLoading === offer.id}
+                      >
+                        {offerPreviewLoading === offer.id ? 'Loading…' : `📄 Signed offer — ${offer.job_title}`}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Experience summary */}
+                {c.experience && (
+                  <div className="detail-card">
+                    <div className="detail-card-title">Experience</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>{c.experience}</div>
+                  </div>
+                )}
+
+                {/* Applications */}
+                <div className="detail-card">
+                  <div className="detail-card-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    Applications
+                    <button className="btn btn-sm" onClick={() => {
+                      onClose()
+                      setTimeout(() => openModal('addApplication', { candidateId: c.id }), 100)
+                    }}>+ Add role</button>
+                  </div>
+                  {apps.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No applications.</div>}
+                  {apps.map((app, i) => {
+                    const job = jobs.find(j => j.id === app.job_id)
+                    return (
+                      <div key={app.id} style={{ padding: '10px 0', borderBottom: i < apps.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{job?.title || app.role || '—'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Applied {daysAgo(app.applied_at)}</div>
+                          </div>
+                          <select
+                            className="stage-select"
+                            style={{ width: 140, fontSize: 12 }}
+                            value={app.stage}
+                            onChange={e => handleStageChange(app, e.target.value)}
+                          >
+                            {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                        {/* Screening question answers */}
+                        {(app.work_authorized !== null && app.work_authorized !== undefined || app.salary_expectations) && (
+                          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {app.work_authorized !== null && app.work_authorized !== undefined && (
+                              <span style={{
+                                fontSize: 11, padding: '2px 8px', borderRadius: 20,
+                                background: app.work_authorized ? '#F0FDF4' : '#FEF2F2',
+                                color: app.work_authorized ? '#15803D' : '#991B1B',
+                                fontWeight: 600,
+                              }}>
+                                {app.work_authorized ? '✓ US work authorized' : '✗ Not US work authorized'}
+                              </span>
+                            )}
+                            {app.salary_expectations && (
+                              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)' }}>
+                                💰 {app.salary_expectations}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Notes & timeline */}
+                <div className="detail-card">
+                  <div className="detail-card-title">Notes & activity</div>
+                  <div className="timeline">
+                    {apps.map(app => {
+                      const job = jobs.find(j => j.id === app.job_id)
+                      return (
+                        <div key={app.id} className="timeline-item">
+                          <div className="tl-dot" style={{ background: 'var(--accent)' }} />
+                          <div>
+                            <div className="tl-text">Applied for <strong>{job?.title || app.role || '—'}</strong> via {c.source}</div>
+                            <div className="tl-time">{daysAgo(app.applied_at)}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {notes.map(n => (
+                      <div key={n.id} className="timeline-item">
+                        <div className="tl-dot" style={{ background: '#8B5CF6' }} />
+                        <div>
+                          <div className="tl-text">{n.text}</div>
+                          <div className="tl-time">{n.job_title} · {daysAgo(n.created_at)}{n.author_name ? ` · ${n.author_name}` : ''}</div>
+                        </div>
+                      </div>
+                    ))}
+                    {apps.length === 0 && notes.length === 0 && (
+                      <div style={{ color: 'var(--text-3)', fontSize: 13 }}>No activity yet.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right column */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                {/* References */}
+                <div className="detail-card">
+                  <div className="detail-card-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    References
+                    <label style={{ cursor: 'pointer' }}>
+                      <input
+                        ref={refInputRef}
+                        type="file"
+                        accept=".pdf"
+                        style={{ display: 'none' }}
+                        onChange={handleUploadReference}
+                        disabled={refUploading}
+                      />
+                      <span className="btn btn-sm">{refUploading ? 'Uploading…' : '+ Upload PDF'}</span>
+                    </label>
+                  </div>
+                  {refLoading && <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Loading…</div>}
+                  {!refLoading && references.length === 0 && (
+                    <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No references uploaded yet.</div>
+                  )}
+                  {references.map(ref => (
+                    <div key={ref.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        📎 {ref.file_name}
+                      </div>
+                      <button
+                        className="btn btn-sm"
+                        disabled={refPreviewLoading === ref.id}
+                        onClick={() => handleViewReference(ref)}
+                      >
+                        {refPreviewLoading === ref.id ? '…' : 'View'}
+                      </button>
+                      <button
+                        className="btn btn-sm btn-danger"
+                        onClick={() => handleDeleteReference(ref)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add note */}
+                <div className="detail-card">
+                  <div className="detail-card-title">Add note</div>
+                  <div className="form-row" style={{ marginBottom: 8 }}>
+                    <label className="form-label">Related to</label>
+                    <select className="stage-select" value={noteRole} onChange={e => setNoteRole(e.target.value)}>
+                      <option value="General">General</option>
+                      {apps.map(app => {
+                        const job = jobs.find(j => j.id === app.job_id)
+                        const title = job?.title || app.role || '—'
+                        return <option key={app.id} value={title}>{title}</option>
+                      })}
+                    </select>
+                  </div>
+                  <textarea
+                    className="note-input"
+                    placeholder="Interview notes, feedback, impressions…"
+                    value={noteText}
+                    onChange={e => setNoteText(e.target.value)}
+                  />
+                  <button className="btn btn-sm" style={{ marginTop: 8, width: '100%' }} onClick={handleSaveNote}>Save note</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Reference PDF preview overlay */}
+      {refPreviewUrl && (
+        <div className="modal-backdrop open" style={{ zIndex: 1100 }} onClick={e => { if (e.target === e.currentTarget) setRefPreviewUrl(null) }}>
+          <div className="modal" style={{ width: '80vw', height: '90vh', display: 'flex', flexDirection: 'column', padding: 0 }}>
+            <div className="modal-head" style={{ padding: '12px 20px' }}>
+              <div className="modal-title">{refPreviewName}</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a href={refPreviewUrl} download={refPreviewName} className="btn btn-sm">↓ Download</a>
+                <button className="modal-close" onClick={() => setRefPreviewUrl(null)}>×</button>
+              </div>
+            </div>
+            <iframe src={refPreviewUrl} style={{ flex: 1, border: 'none', width: '100%' }} title="Reference preview" />
+          </div>
+        </div>
+      )}
+
+      {/* Signed offer PDF preview overlay */}
+      {offerPreviewUrl && (
+        <div
+          className="modal-backdrop open"
+          style={{ zIndex: 1100 }}
+          onClick={e => { if (e.target === e.currentTarget) setOfferPreviewUrl(null) }}
+        >
+          <div className="modal" style={{ width: '80vw', height: '90vh', display: 'flex', flexDirection: 'column', padding: 0 }}>
+            <div className="modal-head" style={{ padding: '12px 20px' }}>
+              <div className="modal-title">{offerPreviewName}</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a href={offerPreviewUrl} download className="btn btn-sm">↓ Download</a>
+                <button className="modal-close" onClick={() => setOfferPreviewUrl(null)}>×</button>
+              </div>
+            </div>
+            <iframe src={offerPreviewUrl} style={{ flex: 1, border: 'none', width: '100%' }} title="Signed offer preview" />
+          </div>
+        </div>
+      )}
+
+      {/* Resume PDF preview overlay */}
+      {resumePreviewUrl && (
+        <div
+          className="modal-backdrop open"
+          style={{ zIndex: 1100 }}
+          onClick={e => { if (e.target === e.currentTarget) setResumePreviewUrl(null) }}
+        >
+          <div className="modal" style={{ width: '80vw', height: '90vh', display: 'flex', flexDirection: 'column', padding: 0 }}>
+            <div className="modal-head" style={{ padding: '12px 20px' }}>
+              <div className="modal-title">{c.resume_name}</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a
+                  href={resumePreviewUrl}
+                  download={c.resume_name}
+                  className="btn btn-sm"
+                >
+                  ↓ Download
+                </a>
+                <button className="modal-close" onClick={() => setResumePreviewUrl(null)}>×</button>
+              </div>
+            </div>
+            <iframe
+              src={resumePreviewUrl}
+              style={{ flex: 1, border: 'none', width: '100%' }}
+              title="Resume preview"
+            />
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
