@@ -19,6 +19,7 @@ export default function AddCandidateModal({ onClose }) {
 
   // Resume upload + parsing
   const [resumeFile, setResumeFile] = useState(null)
+  const [resumeText, setResumeText] = useState('')
   const [parsing, setParsing] = useState(false)
   const [parseStatus, setParseStatus] = useState('') // success or error message
   const fileInputRef = useRef()
@@ -50,6 +51,7 @@ export default function AddCandidateModal({ onClose }) {
       if (data.location && !location) setLocation(data.location)
       if (data.experience && !experience) setExperience(data.experience)
       if (data.source) setSource(data.source)
+      if (data.raw_text) setResumeText(data.raw_text)
 
       setParseStatus('✓ Resume parsed — review the fields below and edit if needed.')
     } catch (err) {
@@ -73,7 +75,7 @@ export default function AddCandidateModal({ onClose }) {
         resumePath = path
         resumeName = resumeFile.name
       }
-      await addCandidate({ fname, lname, email, phone, linkedin, location, experience, source, role, noteText, resumePath, resumeName })
+      await addCandidate({ fname, lname, email, phone, linkedin, location, experience, source, role, noteText, resumePath, resumeName, resumeText: resumeText || null })
       onClose()
     } catch (err) {
       setError(err.message)
