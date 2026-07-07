@@ -204,6 +204,10 @@ export function AppProvider({ children, user }) {
     return data
   }
 
+  async function updateJob(jobId, fields) {
+    await supabase.from('jobs').update(fields).eq('id', jobId)
+  }
+
   async function updateJobStatus(jobId, status) {
     await supabase.from('jobs').update({ status }).eq('id', jobId)
   }
@@ -495,7 +499,7 @@ export function AppProvider({ children, user }) {
       activeJobs, activeCandidates, pendingOffers,
       isAdmin, isHiringManager,
       duplicates, mergeCandidates,
-      addCandidate, addJob, updateJobStatus, updateJobPublish,
+      addCandidate, addJob, updateJob, updateJobStatus, updateJobPublish,
       moveStage, addApplication, addNote, updateCandidateResumeText,
       addInterview, addOffer, updateOfferStatus, updateOfferDocuSign,
       uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, previewOffer, downloadSignedOffer,
