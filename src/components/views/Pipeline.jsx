@@ -289,17 +289,6 @@ export default function Pipeline() {
                           )}
                           <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{daysAgo(x.applied_at)}</span>
                         </div>
-                      </div>
-                    )
-                  })}
-                  {stageCards.length === 0 && (
-                    <div style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '16px 0' }}>—</div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
 
                         {/* Questionnaire responses */}
                         {(x.work_authorized !== null && x.work_authorized !== undefined) || x.salary_expectations ? (
@@ -349,6 +338,17 @@ export default function Pipeline() {
                           </div>
                         )}
                       </div>
+                    )
+                  })}
+                  {stageCards.length === 0 && (
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '16px 0' }}>—</div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
       {/* Floating action bar — appears when candidates are selected */}
       {selectMode && selected.size > 0 && (
