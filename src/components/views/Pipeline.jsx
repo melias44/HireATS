@@ -9,7 +9,7 @@ export default function Pipeline() {
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
   const [selectMode, setSelectMode] = useState(false)
-  const [selected, setSelected] = useState(new Set()) // set of candidateIds
+  const [selected, setSelected] = useState(new Set())
   const [bundling, setBundling] = useState(false)
   const [bundleWarning, setBundleWarning] = useState('')
 
@@ -57,9 +57,9 @@ export default function Pipeline() {
     unassigned = []
   }
 
-  const activeStages = STAGES.filter(s => s !== 'Rejected')
+  // Exclude Applied and Rejected from the pipeline board
+  const activeStages = STAGES.filter(s => s !== 'Applied' && s !== 'Rejected')
 
-  // All candidate IDs currently visible in the filtered view
   const visibleCandidateIds = [
     ...unassigned.map(c => c.id),
     ...cards.map(x => x.candidateId),
@@ -116,7 +116,6 @@ export default function Pipeline() {
 
     try {
       const merged = await PDFDocument.create()
-
       for (const c of pdfCandidates) {
         try {
           const { data } = await supabase.storage.from('resumes').createSignedUrl(c.resume_path, 120)
@@ -130,7 +129,6 @@ export default function Pipeline() {
           // skip individual failures silently
         }
       }
-
       const pdfBytes = await merged.save()
       const blob = new Blob([pdfBytes], { type: 'application/pdf' })
       const url = URL.createObjectURL(blob)
@@ -144,7 +142,6 @@ export default function Pipeline() {
       if (withoutResume.length) warnings.push(`${withoutResume.length} had no resume on file.`)
       if (nonPdf.length) warnings.push(`${nonPdf.length} had Word doc resumes (PDF only supported).`)
       if (warnings.length) setBundleWarning(warnings.join(' '))
-
     } catch (err) {
       setBundleWarning('Bundle failed: ' + err.message)
     } finally {
@@ -342,6 +339,48 @@ export default function Pipeline() {
                               )}
                               <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{daysAgo(x.applied_at)}</span>
                             </div>
+                            {((x.work_authorized !== null && x.work_authorized !== undefined) || x.salary_expectations) && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                                {x.work_authorized !== null && x.work_authorized !== undefined && (
+                                  <span style={{
+                                    fontSize: 10, padding: '2px 7px', borderRadius: 20, fontWeight: 600,
+                                    background: x.work_authorized ? '#DCFCE7' : '#FEE2E2',
+                                    color: x.work_authorized ? '#166534' : '#991B1B',
+                                  }}>
+                                    {x.work_authorized ? '✓ Work auth' : '✗ No work auth'}
+                                  </span>
+                                )}
+                                {x.salary_expectations && (
+                                  <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--surface-2)', color: 'var(--text-2)', fontWeight: 500 }}>
+                                    💰 {x.salary_expectations}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {!selectMode && x.stage !== 'Hired' && (
+                              <div style={{ display: 'flex', gap: 4, marginTop: 8 }} onClick={e => e.stopPropagation()}>
+                                {(() => {
+                                  const nextStage = STAGES[STAGES.indexOf(x.stage) + 1]
+                                  if (!nextStage || nextStage === 'Rejected') return null
+                                  return (
+                                    <button
+                                      className="btn btn-sm"
+                                      style={{ flex: 1, fontSize: 11, padding: '3px 8px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 6 }}
+                                      onClick={() => moveStage(x.id, nextStage)}
+                                    >
+                                      → {nextStage}
+                                    </button>
+                                  )
+                                })()}
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ fontSize: 11, padding: '3px 8px', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: 6 }}
+                                  onClick={() => moveStage(x.id, 'Rejected')}
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -355,7 +394,6 @@ export default function Pipeline() {
             </div>
           </div>
 
-          {/* Floating action bar — appears when candidates are selected */}
           {selectMode && selected.size > 0 && (
             <div style={{
               position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
@@ -365,11 +403,7 @@ export default function Pipeline() {
               zIndex: 500, minWidth: 360,
             }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>{selected.size} candidate{selected.size !== 1 ? 's' : ''} selected</span>
-              <button
-                className="btn btn-primary"
-                onClick={handleBundleResumes}
-                disabled={bundling}
-              >
+              <button className="btn btn-primary" onClick={handleBundleResumes} disabled={bundling}>
                 {bundling ? 'Bundling…' : '📎 Bundle resumes'}
               </button>
               <button className="btn btn-sm" onClick={() => setSelected(new Set())}>Clear</button>
