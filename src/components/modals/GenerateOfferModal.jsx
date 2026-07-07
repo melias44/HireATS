@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useApp } from '../../context/AppContext'
 
 export default function GenerateOfferModal({ onClose }) {
   const { candidates, jobs, offerTemplates, addOffer, sendOfferViaDocuSign, previewOffer } = useApp()
 
   const [candidateId, setCandidateId] = useState('')
+  const [candidateSearch, setCandidateSearch] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
   const [role, setRole] = useState('')
   const [salary, setSalary] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -16,19 +18,49 @@ export default function GenerateOfferModal({ onClose }) {
   const [sending, setSending] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [error, setError] = useState('')
+  const searchRef = useRef(null)
+  const dropdownRef = useRef(null)
 
-  const allCandidates = [...candidates].sort((a, b) => `${a.fname} ${a.lname}`.localeCompare(`${b.fname} ${b.lname}`))
   const selectedCandidate = candidates.find(c => c.id === candidateId)
 
-  function onCandidateChange(id) {
-    setCandidateId(id)
-    if (!id) { setRole(''); return }
-    const c = candidates.find(x => x.id === id)
-    const offerApp = c?.applications?.find(a => a.stage === 'Offer' || a.stage === 'Hired')
+  // Filter candidates by search input
+  const filteredCandidates = candidateSearch.trim()
+    ? candidates
+        .filter(c => `${c.fname} ${c.lname}`.toLowerCase().includes(candidateSearch.toLowerCase()))
+        .sort((a, b) => `${a.fname} ${a.lname}`.localeCompare(`${b.fname} ${b.lname}`))
+        .slice(0, 8)
+    : []
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e) {
+      if (
+        searchRef.current && !searchRef.current.contains(e.target) &&
+        dropdownRef.current && !dropdownRef.current.contains(e.target)
+      ) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  function selectCandidate(c) {
+    setCandidateId(c.id)
+    setCandidateSearch(`${c.fname} ${c.lname}`)
+    setShowDropdown(false)
+    // Auto-fill role from their Offer/Hired application
+    const offerApp = c.applications?.find(a => a.stage === 'Offer' || a.stage === 'Hired')
     if (offerApp) {
       const job = jobs.find(j => j.id === offerApp.job_id)
       setRole(job?.title || '')
     }
+  }
+
+  function handleSearchChange(e) {
+    setCandidateSearch(e.target.value)
+    setCandidateId('') // clear selection when typing again
+    setShowDropdown(true)
   }
 
   async function handlePreview() {
@@ -40,7 +72,6 @@ export default function GenerateOfferModal({ onClose }) {
       const { documentBase64, documentName } = await previewOffer({
         templateId, salary, startDate, role, managerTitle, commissionAmount, offerExpiration, annualBonus, signerName,
       })
-      // Trigger browser download of the filled document
       const binary = atob(documentBase64)
       const bytes = new Uint8Array(binary.length)
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
@@ -67,7 +98,6 @@ export default function GenerateOfferModal({ onClose }) {
     setSending(true)
     setError('')
     try {
-      // 1. Create the offer record
       const offer = await addOffer({
         candidateId,
         candidateName: `${selectedCandidate.fname} ${selectedCandidate.lname}`,
@@ -77,8 +107,6 @@ export default function GenerateOfferModal({ onClose }) {
         startDate: startDate || null,
         letterText: '',
       })
-
-      // 2. Send via DocuSign immediately
       await sendOfferViaDocuSign(offer.id, {
         signerEmail: selectedCandidate.email,
         signerName: `${selectedCandidate.fname} ${selectedCandidate.lname}`,
@@ -91,7 +119,6 @@ export default function GenerateOfferModal({ onClose }) {
         offerExpiration,
         annualBonus,
       })
-
       onClose()
     } catch (err) {
       setError(err.message || 'Something went wrong. Check your DocuSign credentials.')
@@ -103,7 +130,10 @@ export default function GenerateOfferModal({ onClose }) {
     <div className="modal-backdrop open" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal" style={{ width: 580 }}>
         <div className="modal-head">
-          <div><div className="modal-title">Send offer letter</div><div className="modal-sub">Fill in the details — we'll send it via DocuSign</div></div>
+          <div>
+            <div className="modal-title">Send offer letter</div>
+            <div className="modal-sub">Fill in the details — we'll send it via DocuSign</div>
+          </div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
@@ -120,10 +150,59 @@ export default function GenerateOfferModal({ onClose }) {
           <div className="form-grid">
             <div className="form-row">
               <label className="form-label">Candidate *</label>
-              <select className="form-input" value={candidateId} onChange={e => onCandidateChange(e.target.value)}>
-                <option value="">Select candidate…</option>
-                {allCandidates.map(c => <option key={c.id} value={c.id}>{c.fname} {c.lname}</option>)}
-              </select>
+              <div style={{ position: 'relative' }}>
+                <input
+                  ref={searchRef}
+                  className="form-input"
+                  placeholder="Type a name to search…"
+                  value={candidateSearch}
+                  onChange={handleSearchChange}
+                  onFocus={() => { if (candidateSearch.trim()) setShowDropdown(true) }}
+                  autoComplete="off"
+                />
+                {showDropdown && filteredCandidates.length > 0 && (
+                  <div
+                    ref={dropdownRef}
+                    style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300,
+                      background: 'var(--card)', border: '1px solid var(--border)',
+                      borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                      marginTop: 4, overflow: 'hidden',
+                    }}
+                  >
+                    {filteredCandidates.map(c => {
+                      const app = c.applications?.find(a => a.stage === 'Offer' || a.stage === 'Hired')
+                      const jobTitle = app ? jobs.find(j => j.id === app.job_id)?.title : null
+                      return (
+                        <div
+                          key={c.id}
+                          onMouseDown={() => selectCandidate(c)}
+                          style={{
+                            padding: '10px 14px', cursor: 'pointer',
+                            borderBottom: '1px solid var(--border)',
+                            transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{c.fname} {c.lname}</div>
+                          {jobTitle && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{jobTitle}</div>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {showDropdown && candidateSearch.trim() && filteredCandidates.length === 0 && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300,
+                    background: 'var(--card)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '12px 14px', fontSize: 13,
+                    color: 'var(--text-3)', marginTop: 4,
+                  }}>
+                    No candidates found
+                  </div>
+                )}
+              </div>
             </div>
             <div className="form-row">
               <label className="form-label">Offer template *</label>
