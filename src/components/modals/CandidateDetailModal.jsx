@@ -3,7 +3,7 @@ import { useApp, avColor, initials, stageStyle, daysAgo, STAGES } from '../../co
 import { supabase } from '../../lib/supabase'
 
 export default function CandidateDetailModal({ candidateId, onClose }) {
-  const { candidates, jobs, offers, moveStage, updateJobStatus, addNote, openModal, downloadSignedOffer, user } = useApp()
+  const { candidates, jobs, offers, moveStage, updateJobStatus, addNote, deleteNote, openModal, downloadSignedOffer, user } = useApp()
   const [noteText, setNoteText] = useState('')
   const [noteRole, setNoteRole] = useState('General')
   const [resumePreviewUrl, setResumePreviewUrl] = useState(null)
@@ -272,12 +272,17 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
                       )
                     })}
                     {notes.map(n => (
-                      <div key={n.id} className="timeline-item">
-                        <div className="tl-dot" style={{ background: '#8B5CF6' }} />
-                        <div>
+                      <div key={n.id} className="timeline-item" style={{ alignItems: 'flex-start' }}>
+                        <div className="tl-dot" style={{ background: '#8B5CF6', marginTop: 5 }} />
+                        <div style={{ flex: 1 }}>
                           <div className="tl-text">{n.text}</div>
                           <div className="tl-time">{n.job_title} · {daysAgo(n.created_at)}{n.author_name ? ` · ${n.author_name}` : ''}</div>
                         </div>
+                        <button
+                          onClick={() => { if (window.confirm('Delete this note?')) deleteNote(n.id) }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 14, padding: '0 2px', lineHeight: 1, marginTop: 1 }}
+                          title="Delete note"
+                        >✕</button>
                       </div>
                     ))}
                     {apps.length === 0 && notes.length === 0 && (
