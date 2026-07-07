@@ -161,6 +161,7 @@ export default function Jobs({ onNavigate }) {
             </span>
           ) : null}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button className="btn btn-sm" onClick={() => openModal('editJob', { job: selectedJob })}>Edit</button>
             {selectedJob.status === 'Closed' ? (
               <button className="btn btn-sm" onClick={() => { updateJobStatus(selectedJob.id, 'Active'); closeJobDetail() }}>Reopen</button>
             ) : (
