@@ -150,7 +150,7 @@ export function AppProvider({ children, user }) {
   }, [loadAll])
 
   // ── Mutations ─────────────────────────────────────────────────
-  async function addCandidate({ fname, lname, email, source, role, noteText, phone, linkedin, location, experience, resumePath, resumeName }) {
+  async function addCandidate({ fname, lname, email, source, role, noteText, phone, linkedin, location, experience, resumePath, resumeName, resumeText }) {
     const { data: c, error } = await supabase
       .from('candidates')
       .insert({
@@ -161,6 +161,7 @@ export function AppProvider({ children, user }) {
         experience: experience || null,
         resume_path: resumePath || null,
         resume_name: resumeName || null,
+        resume_text: resumeText || null,
       })
       .select()
       .single()
@@ -213,6 +214,10 @@ export function AppProvider({ children, user }) {
 
   async function updateJobPublish(jobId, fields) {
     await supabase.from('jobs').update(fields).eq('id', jobId)
+  }
+
+  async function updateCandidateResumeText(candidateId, resumeText) {
+    await supabase.from('candidates').update({ resume_text: resumeText }).eq('id', candidateId)
   }
 
   async function moveStage(applicationId, stage) {
@@ -491,7 +496,7 @@ export function AppProvider({ children, user }) {
       isAdmin, isHiringManager,
       duplicates, mergeCandidates,
       addCandidate, addJob, updateJobStatus, updateJobPublish,
-      moveStage, addApplication, addNote,
+      moveStage, addApplication, addNote, updateCandidateResumeText,
       addInterview, addOffer, updateOfferStatus, updateOfferDocuSign,
       uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, previewOffer, downloadSignedOffer,
       inviteTeamMember, updateTeamMemberRole, updateJobHiringManager,
