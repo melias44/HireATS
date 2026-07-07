@@ -17,6 +17,7 @@ import GenerateOfferModal from './modals/GenerateOfferModal'
 import PublishJobModal from './modals/PublishJobModal'
 import AddApplicationModal from './modals/AddApplicationModal'
 import MergeCandidatesModal from './modals/MergeCandidatesModal'
+import EditJobModal from './modals/EditJobModal'
 
 const VIEWS = {
   dashboard: { label: 'Dashboard', component: Dashboard },
@@ -89,6 +90,7 @@ export default function Layout() {
       {modal?.name === 'publishJob' && <PublishJobModal jobId={modal.props.jobId} onClose={closeModal} />}
       {modal?.name === 'addApplication' && <AddApplicationModal candidateId={modal.props.candidateId} onClose={closeModal} />}
       {modal?.name === 'mergeCandidates' && <MergeCandidatesModal onClose={closeModal} />}
+      {modal?.name === 'editJob' && <EditJobModal job={modal.props.job} onClose={closeModal} />}
     </>
   )
 }
