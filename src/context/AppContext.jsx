@@ -24,11 +24,8 @@ export function initials(fname, lname) {
 }
 export function daysAgo(dateStr) {
   if (!dateStr) return '—'
-  const ms = Date.now() - new Date(dateStr).getTime()
-  const d = Math.floor(ms / 86400000)
-  if (d === 0) return 'Today'
-  if (d === 1) return 'Yesterday'
-  return `${d}d ago`
+  const d = new Date(dateStr)
+  return `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`
 }
 export function stageStyle(stage) {
   const map = {
@@ -247,6 +244,10 @@ export function AppProvider({ children, user }) {
       author_id: user.id,
       author_name: user.email,
     })
+  }
+
+  async function deleteNote(noteId) {
+    await supabase.from('notes').delete().eq('id', noteId)
   }
 
   async function addInterview({ candidateId, candidateName, jobId, jobTitle, interviewer, type, scheduledAt }) {
@@ -483,7 +484,7 @@ export function AppProvider({ children, user }) {
       isAdmin, isHiringManager,
       duplicates, mergeCandidates,
       addCandidate, addJob, updateJob, updateJobStatus, updateJobPublish,
-      moveStage, addApplication, addNote, updateCandidateResumeText,
+      moveStage, addApplication, addNote, deleteNote, updateCandidateResumeText,
       addInterview, addOffer, updateOfferStatus, updateOfferDocuSign,
       uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, previewOffer, downloadSignedOffer,
       inviteTeamMember, updateTeamMemberRole, updateJobHiringManager,
