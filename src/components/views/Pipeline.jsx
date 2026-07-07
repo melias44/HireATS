@@ -289,6 +289,65 @@ export default function Pipeline() {
                           )}
                           <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{daysAgo(x.applied_at)}</span>
                         </div>
+
+                        {/* Questionnaire responses */}
+                        {(x.work_authorized !== null && x.work_authorized !== undefined) || x.salary_expectations ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                            {x.work_authorized !== null && x.work_authorized !== undefined && (
+                              <span style={{
+                                fontSize: 10, padding: '2px 7px', borderRadius: 20, fontWeight: 600,
+                                background: x.work_authorized ? '#DCFCE7' : '#FEE2E2',
+                                color: x.work_authorized ? '#166534' : '#991B1B',
+                              }}>
+                                {x.work_authorized ? '✓ Work auth' : '✗ No work auth'}
+                              </span>
+                            )}
+                            {x.salary_expectations && (
+                              <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--surface-2)', color: 'var(--text-2)', fontWeight: 500 }}>
+                                💰 {x.salary_expectations}
+                              </span>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {/* Quick actions */}
+                        {!selectMode && x.stage !== 'Hired' && (
+                          <div style={{ display: 'flex', gap: 4, marginTop: 8 }} onClick={e => e.stopPropagation()}>
+                            {x.stage !== 'Rejected' && (() => {
+                              const nextStage = STAGES[STAGES.indexOf(x.stage) + 1]
+                              if (!nextStage || nextStage === 'Rejected') return null
+                              return (
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ flex: 1, fontSize: 11, padding: '3px 8px', background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 6 }}
+                                  onClick={() => moveStage(x.id, nextStage)}
+                                >
+                                  → {nextStage}
+                                </button>
+                              )
+                            })()}
+                            {x.stage !== 'Rejected' && (
+                              <button
+                                className="btn btn-sm"
+                                style={{ fontSize: 11, padding: '3px 8px', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: 6 }}
+                                onClick={() => moveStage(x.id, 'Rejected')}
+                              >
+                                Reject
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {stageCards.length === 0 && (
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '16px 0' }}>—</div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* Floating action bar — appears when candidates are selected */}
