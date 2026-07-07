@@ -52,7 +52,7 @@ export function plainToHtml(text) {
 
 export default function RichTextEditor({ value, onChange, placeholder = 'Describe the role…' }) {
   const editorRef = useRef(null)
-  const lastHtml = useRef(value || '')
+  const lastHtml = useRef('')
 
   // Set content when value changes from outside (e.g. AI fill-in)
   // Only update DOM if content actually differs, to avoid cursor jump
