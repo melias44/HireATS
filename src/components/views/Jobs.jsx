@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 
 export default function Jobs({ onNavigate }) {
   const { jobs, candidates, openModal, updateJobStatus, moveStage, addNote, user, team, isAdmin, updateJobHiringManager } = useApp()
+  const [jobTab, setJobTab] = useState('active') // 'active' | 'closed'
   const [selectedJobId, setSelectedJobId] = useState(null)
   const [selectedCandidateId, setSelectedCandidateId] = useState(null)
   const [noteText, setNoteText] = useState('')
@@ -160,10 +161,28 @@ export default function Jobs({ onNavigate }) {
             </span>
           ) : null}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <button className="btn btn-sm" onClick={() => openModal('publishJob', { jobId: selectedJob.id })}>Publish</button>
-            <button className="btn btn-sm" onClick={() => updateJobStatus(selectedJob.id, selectedJob.status === 'Active' ? 'Paused' : 'Active')}>
-              {selectedJob.status === 'Active' ? 'Pause' : 'Activate'}
-            </button>
+            {selectedJob.status === 'Closed' ? (
+              <button className="btn btn-sm" onClick={() => { updateJobStatus(selectedJob.id, 'Active'); closeJobDetail() }}>Reopen</button>
+            ) : (
+              <>
+                <button className="btn btn-sm" onClick={() => openModal('publishJob', { jobId: selectedJob.id })}>Publish</button>
+                <button className="btn btn-sm" onClick={() => updateJobStatus(selectedJob.id, selectedJob.status === 'Active' ? 'Paused' : 'Active')}>
+                  {selectedJob.status === 'Active' ? 'Pause' : 'Activate'}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  style={{ color: '#DC2626', borderColor: '#FECACA' }}
+                  onClick={() => {
+                    if (window.confirm(`Close "${selectedJob.title}"? It will be taken down from the careers page and moved to Closed jobs.`)) {
+                      updateJobStatus(selectedJob.id, 'Closed')
+                      closeJobDetail()
+                    }
+                  }}
+                >
+                  Close job
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -402,33 +421,50 @@ export default function Jobs({ onNavigate }) {
   }
 
   // Jobs list view
+  const activeJobs = jobs.filter(j => j.status !== 'Closed')
+  const closedJobs = jobs.filter(j => j.status === 'Closed')
+  const visibleJobs = jobTab === 'active' ? activeJobs : closedJobs
+
   return (
     <div className="section-card">
       <div className="section-head">
-        <span className="section-title">All job postings</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span className="section-title">Job postings</span>
+          <div style={{ display: 'flex', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, gap: 2 }}>
+            <button
+              onClick={() => setJobTab('active')}
+              style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, background: jobTab === 'active' ? 'var(--card)' : 'transparent', color: jobTab === 'active' ? 'var(--text-1)' : 'var(--text-3)', boxShadow: jobTab === 'active' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}
+            >
+              Active {activeJobs.length > 0 && <span style={{ marginLeft: 4, background: 'var(--accent-bg)', color: 'var(--accent-text)', borderRadius: 20, padding: '0 6px', fontSize: 11 }}>{activeJobs.length}</span>}
+            </button>
+            <button
+              onClick={() => setJobTab('closed')}
+              style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, background: jobTab === 'closed' ? 'var(--card)' : 'transparent', color: jobTab === 'closed' ? 'var(--text-1)' : 'var(--text-3)', boxShadow: jobTab === 'closed' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}
+            >
+              Closed {closedJobs.length > 0 && <span style={{ marginLeft: 4, background: 'var(--surface-2)', color: 'var(--text-3)', borderRadius: 20, padding: '0 6px', fontSize: 11 }}>{closedJobs.length}</span>}
+            </button>
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <a
-            href="/careers.html"
-            target="_blank"
-            rel="noreferrer"
-            className="btn btn-sm"
-            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}
-          >
+          <a href="/careers.html" target="_blank" rel="noreferrer" className="btn btn-sm" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
             🌐 Preview careers page
           </a>
           <button className="btn btn-sm btn-primary" onClick={() => openModal('addJob')}>+ New posting</button>
         </div>
       </div>
       <div className="table-wrap">
-        {jobs.length === 0 ? (
-          <div className="empty-state"><div className="empty-icon">💼</div><div className="empty-text">No jobs yet — create your first posting.</div></div>
+        {visibleJobs.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">{jobTab === 'closed' ? '🗄️' : '💼'}</div>
+            <div className="empty-text">{jobTab === 'closed' ? 'No closed jobs yet.' : 'No jobs yet — create your first posting.'}</div>
+          </div>
         ) : (
           <table>
             <thead>
               <tr><th>Job title</th><th>Department</th><th>Location</th><th>Status</th><th>Published to</th><th>Applicants</th><th>Posted</th><th></th></tr>
             </thead>
             <tbody>
-              {jobs.map(j => {
+              {visibleJobs.map(j => {
                 const appCount = candidates.filter(c => c.applications?.some(a => a.job_id === j.id)).length
                 return (
                   <tr key={j.id} style={{ cursor: 'pointer' }} onClick={() => openJobDetail(j.id)}>
@@ -442,22 +478,39 @@ export default function Jobs({ onNavigate }) {
                     <td>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <span style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: j.careers_published ? '#16A34A' : '#9A9590', display: 'inline-block' }} />
-                          <span style={{ color: j.careers_published ? 'var(--green-text)' : 'var(--text-3)' }}>Careers page</span>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: j.careers_published && j.status !== 'Closed' ? '#16A34A' : '#9A9590', display: 'inline-block' }} />
+                          <span style={{ color: j.careers_published && j.status !== 'Closed' ? 'var(--green-text)' : 'var(--text-3)' }}>Careers page</span>
                         </span>
                         <span style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: j.linkedin_published ? '#0A66C2' : '#9A9590', display: 'inline-block' }} />
-                          <span style={{ color: j.linkedin_published ? '#0A66C2' : 'var(--text-3)' }}>LinkedIn</span>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: j.linkedin_published && j.status !== 'Closed' ? '#0A66C2' : '#9A9590', display: 'inline-block' }} />
+                          <span style={{ color: j.linkedin_published && j.status !== 'Closed' ? '#0A66C2' : 'var(--text-3)' }}>LinkedIn</span>
                         </span>
                       </div>
                     </td>
                     <td><strong>{appCount}</strong></td>
                     <td>{j.posted_at ? new Date(j.posted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
                     <td style={{ whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
-                      <button className="btn btn-sm" style={{ marginRight: 4 }} onClick={() => openModal('publishJob', { jobId: j.id })}>Publish</button>
-                      <button className="btn btn-sm" onClick={() => updateJobStatus(j.id, j.status === 'Active' ? 'Paused' : 'Active')}>
-                        {j.status === 'Active' ? 'Pause' : 'Activate'}
-                      </button>
+                      {j.status === 'Closed' ? (
+                        <button className="btn btn-sm" onClick={() => updateJobStatus(j.id, 'Active')}>Reopen</button>
+                      ) : (
+                        <>
+                          <button className="btn btn-sm" style={{ marginRight: 4 }} onClick={() => openModal('publishJob', { jobId: j.id })}>Publish</button>
+                          <button className="btn btn-sm" style={{ marginRight: 4 }} onClick={() => updateJobStatus(j.id, j.status === 'Active' ? 'Paused' : 'Active')}>
+                            {j.status === 'Active' ? 'Pause' : 'Activate'}
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            style={{ color: '#DC2626', borderColor: '#FECACA' }}
+                            onClick={() => {
+                              if (window.confirm(`Close "${j.title}"? It will be taken down from the careers page.`)) {
+                                updateJobStatus(j.id, 'Closed')
+                              }
+                            }}
+                          >
+                            Close
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 )
