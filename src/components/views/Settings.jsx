@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import { supabase } from '../../lib/supabase'
 
 const ROLE_STYLES = {
   admin:           { bg: '#EEF4FF', color: '#1D4ED8', label: 'Admin' },
@@ -9,44 +8,7 @@ const ROLE_STYLES = {
 }
 
 export default function Settings() {
-  const { team, candidates, inviteTeamMember, updateTeamMemberRole, updateCandidateResumeText, isAdmin, user } = useApp()
-
-  // Resume indexing
-  const [indexing, setIndexing] = useState(false)
-  const [indexStatus, setIndexStatus] = useState('')
-
-  const unindexed = candidates.filter(c => c.resume_path && !c.resume_text)
-
-  async function handleIndexResumes() {
-    if (unindexed.length === 0) return
-    setIndexing(true)
-    setIndexStatus(`Indexing 0 / ${unindexed.length}…`)
-    let done = 0
-    for (const c of unindexed) {
-      try {
-        const { data: urlData } = await supabase.storage.from('resumes').createSignedUrl(c.resume_path, 120)
-        if (!urlData?.signedUrl) { done++; continue }
-        const res = await fetch(urlData.signedUrl)
-        const blob = await res.blob()
-        const arrayBuffer = await blob.arrayBuffer()
-        const uint8 = new Uint8Array(arrayBuffer)
-        let binary = ''
-        uint8.forEach(b => (binary += String.fromCharCode(b)))
-        const fileBase64 = btoa(binary)
-        const fileType = blob.type || 'application/pdf'
-        const { data, error } = await supabase.functions.invoke('parse-resume', {
-          body: { fileBase64, fileType },
-        })
-        if (!error && data?.raw_text) {
-          await updateCandidateResumeText(c.id, data.raw_text)
-        }
-      } catch { /* skip failures silently */ }
-      done++
-      setIndexStatus(`Indexing ${done} / ${unindexed.length}…`)
-    }
-    setIndexStatus(`Done — ${done} resume${done !== 1 ? 's' : ''} indexed.`)
-    setIndexing(false)
-  }
+  const { team, inviteTeamMember, updateTeamMemberRole, isAdmin, user } = useApp()
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('member')
@@ -127,35 +89,6 @@ export default function Settings() {
               </tbody>
             </table>
           )}
-        </div>
-      </div>
-
-      {/* Resume search index */}
-      <div className="section-card" style={{ marginBottom: 24 }}>
-        <div className="section-head">
-          <span className="section-title">Resume search index</span>
-        </div>
-        <div style={{ padding: '16px 24px' }}>
-          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>
-            Resumes uploaded after enabling search are indexed automatically. Use this to index existing resumes so they appear in boolean search results.
-          </div>
-          {unindexed.length === 0 ? (
-            <div style={{ fontSize: 13, color: '#15803D' }}>✓ All resumes are indexed.</div>
-          ) : (
-            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>
-              {unindexed.length} resume{unindexed.length !== 1 ? 's' : ''} not yet indexed.
-            </div>
-          )}
-          {indexStatus && (
-            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10 }}>{indexStatus}</div>
-          )}
-          <button
-            className="btn btn-primary"
-            onClick={handleIndexResumes}
-            disabled={indexing || unindexed.length === 0}
-          >
-            {indexing ? indexStatus : `Index ${unindexed.length} resume${unindexed.length !== 1 ? 's' : ''}`}
-          </button>
         </div>
       </div>
 
