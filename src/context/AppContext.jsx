@@ -247,7 +247,9 @@ export function AppProvider({ children, user }) {
   }
 
   async function deleteNote(noteId) {
-    await supabase.from('notes').delete().eq('id', noteId)
+    const { error } = await supabase.from('notes').delete().eq('id', noteId)
+    if (error) throw error
+    await loadAll()
   }
 
   async function addInterview({ candidateId, candidateName, jobId, jobTitle, interviewer, type, scheduledAt }) {
