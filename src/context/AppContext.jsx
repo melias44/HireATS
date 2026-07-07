@@ -58,7 +58,7 @@ export function AppProvider({ children, user }) {
   const [offerTemplates, setOfferTemplates] = useState([])
   const [team, setTeam] = useState([])
   const [loading, setLoading] = useState(true)
-  const [modal, setModal] = useState(null)   // { name, props? }
+  const [modal, setModal] = useState(null)
 
   // ── Initial load ─────────────────────────────────────────────
   const loadAll = useCallback(async () => {
@@ -83,7 +83,6 @@ export function AppProvider({ children, user }) {
       supabase.from('profiles').select('*').order('created_at', { ascending: true }),
     ])
 
-    // Bootstrap: if the current user has no profile yet, create them as admin (first user)
     const myProfile = (teamData || []).find(p => p.id === user.id)
     if (!myProfile) {
       await supabase.from('profiles').upsert({
@@ -92,21 +91,18 @@ export function AppProvider({ children, user }) {
         full_name: user.user_metadata?.full_name || '',
         role: 'admin',
       }, { onConflict: 'id' })
-      // Re-fetch after upsert
       const { data: refreshed } = await supabase.from('profiles').select('*').order('created_at', { ascending: true })
       setTeam(refreshed || [])
     } else {
       setTeam(teamData || [])
     }
 
-    // Attach applications + notes to each candidate
     const enriched = (candidatesData || []).map(c => ({
       ...c,
       applications: (appsData || []).filter(a => a.candidate_id === c.id),
       notes: (notesData || []).filter(n => n.candidate_id === c.id),
     }))
 
-    // For hiring managers, restrict to only their assigned jobs + related candidates
     const resolvedProfile = (teamData || []).find(p => p.id === user.id) || (myProfile ? null : { role: 'admin' })
     const isHM = resolvedProfile?.role === 'hiring_manager'
 
@@ -130,7 +126,6 @@ export function AppProvider({ children, user }) {
     setNotes(notesData || [])
     setOfferTemplates(templatesData || [])
     setLoading(false)
-    // Note: team/profiles set above in bootstrap block
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
@@ -167,7 +162,6 @@ export function AppProvider({ children, user }) {
       .single()
     if (error) throw error
 
-    // Find job_id
     const job = jobs.find(j => j.title === role)
     if (job) {
       await supabase.from('applications').insert({
@@ -210,6 +204,14 @@ export function AppProvider({ children, user }) {
 
   async function updateJobStatus(jobId, status) {
     await supabase.from('jobs').update({ status }).eq('id', jobId)
+    // Auto-reject all 'Applied' candidates when a job is closed
+    if (status === 'Closed') {
+      await supabase
+        .from('applications')
+        .update({ stage: 'Rejected' })
+        .eq('job_id', jobId)
+        .eq('stage', 'Applied')
+    }
   }
 
   async function updateJobHiringManager(jobId, hiringManagerId) {
@@ -351,23 +353,17 @@ export function AppProvider({ children, user }) {
   }
 
   async function sendOfferViaDocuSign(offerId, { signerEmail, signerName, templateId, salary, startDate, role, managerTitle, commissionAmount, offerExpiration, annualBonus }) {
-    // 1. Download the template file from Supabase Storage
     const template = offerTemplates.find(t => t.id === templateId)
     if (!template) throw new Error('Template not found')
     const { data: fileData, error: dlError } = await supabase.storage
       .from('offer-templates')
       .download(template.file_path)
     if (dlError) throw dlError
-
-    // 2. Convert to base64
     const arrayBuffer = await fileData.arrayBuffer()
     const uint8 = new Uint8Array(arrayBuffer)
     let binary = ''
     uint8.forEach(b => binary += String.fromCharCode(b))
     const documentBase64 = btoa(binary)
-
-    // 3. Call the Edge Function
-    const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     const { data, error } = await supabase.functions.invoke('docusign-send', {
       body: {
         signerEmail,
@@ -381,15 +377,12 @@ export function AppProvider({ children, user }) {
     })
     if (error) throw error
     if (data?.error) throw new Error(data.error)
-
-    // 4. Update offer record with DocuSign envelope info
     const { error: updateError } = await supabase.from('offers').update({
       docusign_envelope_id: data.envelopeId,
       docusign_status: 'sent',
       sent_at: new Date().toISOString(),
     }).eq('id', offerId)
     if (updateError) throw new Error(`Offer sent but DB update failed: ${updateError.message}`)
-
     return data
   }
 
@@ -399,7 +392,6 @@ export function AppProvider({ children, user }) {
     })
     if (error) throw error
     if (data?.error) throw new Error(data.error)
-    // Reload team list
     const { data: refreshed } = await supabase.from('profiles').select('*').order('created_at', { ascending: true })
     setTeam(refreshed || [])
   }
@@ -416,7 +408,6 @@ export function AppProvider({ children, user }) {
 
     const keepJobIds = new Set((keep.applications || []).map(a => a.job_id))
 
-    // 1. Move applications that don't conflict; delete duplicates
     for (const app of (discard.applications || [])) {
       if (keepJobIds.has(app.job_id)) {
         await supabase.from('applications').delete().eq('id', app.id)
@@ -425,24 +416,20 @@ export function AppProvider({ children, user }) {
       }
     }
 
-    // 2. Move notes, interviews, offers, references
     await supabase.from('notes').update({ candidate_id: keepId }).eq('candidate_id', discardId)
     await supabase.from('interviews').update({ candidate_id: keepId }).eq('candidate_id', discardId)
     await supabase.from('offers').update({ candidate_id: keepId }).eq('candidate_id', discardId)
     await supabase.from('candidate_references').update({ candidate_id: keepId }).eq('candidate_id', discardId)
 
-    // 3. Fill in any missing fields on the kept profile from the discarded one
     const patch = {}
-    if (!keep.phone       && discard.phone)        patch.phone        = discard.phone
+    if (!keep.phone        && discard.phone)        patch.phone        = discard.phone
     if (!keep.linkedin_url && discard.linkedin_url) patch.linkedin_url = discard.linkedin_url
     if (!keep.resume_path  && discard.resume_path)  { patch.resume_path = discard.resume_path; patch.resume_name = discard.resume_name }
     if (Object.keys(patch).length) {
       await supabase.from('candidates').update(patch).eq('id', keepId)
     }
 
-    // 4. Delete the discarded candidate
     await supabase.from('candidates').delete().eq('id', discardId)
-
     await loadAll()
   }
 
@@ -454,7 +441,6 @@ export function AppProvider({ children, user }) {
   const isAdmin = !myProfile || myProfile.role === 'admin'
   const isHiringManager = myProfile?.role === 'hiring_manager'
 
-  // Duplicate detection — pairs of candidates sharing email or phone
   const duplicates = (() => {
     const pairs = []
     const pairSet = new Set()
@@ -481,13 +467,10 @@ export function AppProvider({ children, user }) {
   const activeCandidates = candidates.filter(c => {
     const apps = c.applications || []
     if (!apps.length) return false
-    // All rejected → out
     if (apps.every(a => a.stage === 'Rejected')) return false
-    // Any in-flight application → keep
     if (apps.some(a => a.stage !== 'Hired' && a.stage !== 'Rejected')) return true
-    // All remaining are Hired — keep until start date arrives
     const offer = offers.find(o => o.candidate_id === c.id && o.start_date)
-    if (!offer?.start_date) return true // no start date set yet, keep in pipeline
+    if (!offer?.start_date) return true
     const startDate = new Date(offer.start_date + 'T00:00:00')
     return startDate >= todayMidnight
   })
