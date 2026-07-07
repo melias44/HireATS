@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
+import { supabase } from '../../lib/supabase'
 
 const ROLE_STYLES = {
   admin:           { bg: '#EEF4FF', color: '#1D4ED8', label: 'Admin' },
@@ -8,7 +9,73 @@ const ROLE_STYLES = {
 }
 
 export default function Settings() {
-  const { team, inviteTeamMember, updateTeamMemberRole, isAdmin, user } = useApp()
+  const { team, candidates, inviteTeamMember, updateTeamMemberRole, updateCandidateResumeText, isAdmin, user } = useApp()
+
+  // Resume indexing
+  const [indexing, setIndexing] = useState(false)
+  const [indexLog, setIndexLog] = useState([])
+
+  const unindexed = candidates.filter(c => c.resume_path && !c.resume_text)
+
+  async function handleIndexResumes() {
+    if (unindexed.length === 0) return
+    setIndexing(true)
+    setIndexLog([`Starting — ${unindexed.length} resume(s) to index…`])
+
+    for (let i = 0; i < unindexed.length; i++) {
+      const c = unindexed[i]
+      const label = `${c.fname} ${c.lname}`
+      try {
+        const { data: urlData, error: urlErr } = await supabase.storage
+          .from('resumes').createSignedUrl(c.resume_path, 120)
+        if (urlErr || !urlData?.signedUrl) {
+          setIndexLog(l => [...l, `❌ ${label}: failed to get signed URL — ${urlErr?.message || 'no URL'}`])
+          continue
+        }
+
+        const res = await fetch(urlData.signedUrl)
+        if (!res.ok) {
+          setIndexLog(l => [...l, `❌ ${label}: download failed (${res.status})`])
+          continue
+        }
+
+        const blob = await res.blob()
+        const arrayBuffer = await blob.arrayBuffer()
+        const uint8 = new Uint8Array(arrayBuffer)
+        let binary = ''
+        uint8.forEach(b => (binary += String.fromCharCode(b)))
+        const fileBase64 = btoa(binary)
+        const fileType = blob.type || 'application/pdf'
+
+        const { data, error: fnErr } = await supabase.functions.invoke('parse-resume', {
+          body: { fileBase64, fileType },
+        })
+
+        if (fnErr) {
+          setIndexLog(l => [...l, `❌ ${label}: edge function error — ${fnErr.message}`])
+          continue
+        }
+        if (!data?.raw_text) {
+          setIndexLog(l => [...l, `⚠️ ${label}: function returned no text — ${JSON.stringify(data)}`])
+          continue
+        }
+
+        const { error: updateErr } = await supabase
+          .from('candidates').update({ resume_text: data.raw_text }).eq('id', c.id)
+        if (updateErr) {
+          setIndexLog(l => [...l, `❌ ${label}: DB update failed — ${updateErr.message}`])
+          continue
+        }
+
+        setIndexLog(l => [...l, `✓ ${label} (${i + 1}/${unindexed.length})`])
+      } catch (err) {
+        setIndexLog(l => [...l, `❌ ${label}: unexpected error — ${err.message}`])
+      }
+    }
+
+    setIndexLog(l => [...l, 'Done.'])
+    setIndexing(false)
+  }
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('member')
@@ -88,6 +155,44 @@ export default function Settings() {
                 })}
               </tbody>
             </table>
+          )}
+        </div>
+      </div>
+
+      {/* Resume search index */}
+      <div className="section-card" style={{ marginBottom: 24 }}>
+        <div className="section-head">
+          <span className="section-title">Resume search index</span>
+        </div>
+        <div style={{ padding: '16px 24px' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>
+            {unindexed.length === 0
+              ? <span style={{ color: '#15803D' }}>✓ All resumes are indexed.</span>
+              : <span>{unindexed.length} resume{unindexed.length !== 1 ? 's' : ''} not yet indexed.</span>
+            }
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={handleIndexResumes}
+            disabled={indexing || unindexed.length === 0}
+            style={{ marginBottom: indexLog.length ? 12 : 0 }}
+          >
+            {indexing ? 'Indexing…' : `Index ${unindexed.length} resume${unindexed.length !== 1 ? 's' : ''}`}
+          </button>
+          {indexLog.length > 0 && (
+            <div style={{
+              marginTop: 12, background: 'var(--bg)', border: '1px solid var(--border)',
+              borderRadius: 8, padding: '10px 14px', fontSize: 12,
+              fontFamily: 'monospace', color: 'var(--text-2)',
+              maxHeight: 200, overflowY: 'auto',
+              display: 'flex', flexDirection: 'column', gap: 3,
+            }}>
+              {indexLog.map((line, i) => (
+                <div key={i} style={{ color: line.startsWith('❌') ? '#DC2626' : line.startsWith('⚠️') ? '#D97706' : 'inherit' }}>
+                  {line}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
