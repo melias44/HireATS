@@ -470,12 +470,17 @@ export function AppProvider({ children, user }) {
   const activeCandidates = candidates.filter(c => {
     const apps = c.applications || []
     if (!apps.length) return false
-    if (apps.every(a => a.stage === 'Rejected')) return false
-    if (apps.some(a => a.stage !== 'Hired' && a.stage !== 'Rejected')) return true
-    const offer = offers.find(o => o.candidate_id === c.id && o.start_date)
-    if (!offer?.start_date) return true
-    const startDate = new Date(offer.start_date + 'T00:00:00')
-    return startDate >= todayMidnight
+    // Only count candidates who have moved past Applied
+    const progressedStages = ['Phone Screen', 'Interview', 'Offer']
+    if (apps.some(a => progressedStages.includes(a.stage))) return true
+    // Include Hired candidates whose start date hasn't passed yet
+    if (apps.some(a => a.stage === 'Hired')) {
+      const offer = offers.find(o => o.candidate_id === c.id && o.start_date)
+      if (!offer?.start_date) return true
+      const startDate = new Date(offer.start_date + 'T00:00:00')
+      return startDate >= todayMidnight
+    }
+    return false
   })
   const pendingOffers = offers.filter(o => o.status === 'Pending')
 
