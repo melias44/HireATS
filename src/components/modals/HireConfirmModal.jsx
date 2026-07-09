@@ -9,15 +9,16 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
   const linkedOffer = offers.find(o => o.candidate_id === candidate.id && o.job_id === app.job_id)
 
   const [form, setForm] = useState({
-    name:       `${candidate.fname} ${candidate.lname}`,
-    email:      candidate.email || '',
-    jobTitle:   job?.title || '',
-    manager:    '',
-    startDate:  linkedOffer?.start_date || '',
-    location:   candidate.location || '',
-    salary:     linkedOffer?.salary || '',
-    bonus:      '',
-    commission: '',
+    name:           `${candidate.fname} ${candidate.lname}`,
+    email:          candidate.email || '',
+    jobTitle:       job?.title || '',
+    manager:        '',
+    startDate:      linkedOffer?.start_date || '',
+    location:       candidate.location || '',
+    salary:         linkedOffer?.salary || '',
+    bonus:          '',
+    commission:     '',
+    employmentType: 'Full Time',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
@@ -123,7 +124,13 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
               <label className="form-label">Commission</label>
               <input className="form-input" placeholder="e.g. $10,000 or N/A" value={form.commission} onChange={e => set('commission', e.target.value)} />
             </div>
-            <div className="form-row" />
+            <div className="form-row">
+              <label className="form-label">Employment type</label>
+              <select className="form-input" value={form.employmentType} onChange={e => set('employmentType', e.target.value)}>
+                <option value="Full Time">Full Time</option>
+                <option value="Part Time">Part Time</option>
+              </select>
+            </div>
           </div>
 
           <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
