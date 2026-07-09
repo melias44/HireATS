@@ -119,44 +119,44 @@ export default function Jobs({ onNavigate }) {
     setNoteText('')
   }
 
-  function downloadJobPDF(job) {
-    // Clean up TinyMCE artifacts and CSS variables that won't work outside the app
+  async function downloadJobPDF(job) {
+    // Load html2pdf from CDN if not already loaded
+    if (!window.html2pdf) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script')
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
+        s.onload = resolve
+        s.onerror = reject
+        document.head.appendChild(s)
+      })
+    }
+
     const cleanDesc = (job.description || '<p>No description provided.</p>')
       .replace(/<!--.*?-->/gs, '')
       .replace(/color:\s*var\([^)]+\)/g, 'color: #222')
       .replace(/background-color:\s*var\([^)]+\)/g, 'background-color: transparent')
-    const w = window.open('', '_blank')
-    w.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <title>${job.title} — Job Description</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; max-width: 740px; margin: 48px auto; color: #111; line-height: 1.6; padding: 0 32px; }
-    h1 { font-size: 24px; font-weight: 700; margin: 0 0 6px; }
-    .meta { color: #555; font-size: 13px; margin-bottom: 28px; display: flex; flex-wrap: wrap; gap: 12px 20px; }
-    hr { border: none; border-top: 1px solid #ddd; margin: 20px 0; }
-    .description { font-size: 14px; color: #222; }
-    .description ul, .description ol { padding-left: 24px; }
-    .description p { margin: 6px 0; }
-    @media print { body { margin: 20px 32px; } }
-  </style>
-</head>
-<body>
-  <h1>${job.title}</h1>
-  <div class="meta">
-    ${job.dept ? `<span>🏢 ${job.dept}</span>` : ''}
-    ${job.location ? `<span>📍 ${job.location}</span>` : ''}
-    ${job.employment_type ? `<span>${job.employment_type}</span>` : ''}
-    ${job.salary ? `<span>${job.salary}</span>` : ''}
-  </div>
-  <hr/>
-  <div class="description">${cleanDesc}</div>
-</body>
-</html>`)
-    w.document.close()
-    w.focus()
-    setTimeout(() => { w.print() }, 400)
+
+    const el = document.createElement('div')
+    el.style.cssText = 'font-family: Arial, sans-serif; padding: 32px; color: #111; line-height: 1.6;'
+    el.innerHTML = `
+      <h1 style="font-size:22px;font-weight:700;margin:0 0 6px;">${job.title}</h1>
+      <div style="color:#555;font-size:13px;margin-bottom:24px;display:flex;gap:16px;flex-wrap:wrap;">
+        ${job.dept ? `<span>🏢 ${job.dept}</span>` : ''}
+        ${job.location ? `<span>📍 ${job.location}</span>` : ''}
+        ${job.employment_type ? `<span>${job.employment_type}</span>` : ''}
+        ${job.salary ? `<span>${job.salary}</span>` : ''}
+      </div>
+      <hr style="border:none;border-top:1px solid #ddd;margin:0 0 20px;"/>
+      <div style="font-size:13px;color:#222;">${cleanDesc}</div>
+    `
+
+    const filename = `${job.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-job-description.pdf`
+    await window.html2pdf().set({
+      margin: [10, 10, 10, 10],
+      filename,
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    }).from(el).save()
   }
 
   async function handleMoveStage(applicationId, stage) {
