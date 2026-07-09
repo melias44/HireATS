@@ -31,17 +31,19 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
     setSaving(true)
     setError('')
     try {
-      // Write to Google Sheet via Edge Function
       const { error: fnErr } = await supabase.functions.invoke('sync-hired', { body: form })
-      if (fnErr) throw fnErr
+      if (fnErr) throw new Error(fnErr.message)
       await onConfirm()
     } catch (err) {
-      setError(`Saved to ATS but sheet sync failed: ${err.message}`)
-      // Still confirm the hire even if sheet fails
-      await onConfirm()
-    } finally {
+      setError(`Sheet sync failed: ${err.message}`)
       setSaving(false)
     }
+  }
+
+  async function handleSkipAndConfirm() {
+    setSaving(true)
+    await onConfirm()
+    setSaving(false)
   }
 
   return (
@@ -131,6 +133,11 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
 
         <div className="modal-footer">
           <button className="btn" onClick={onCancel} disabled={saving}>Cancel</button>
+          {error && (
+            <button className="btn" onClick={handleSkipAndConfirm} disabled={saving} title="Confirm the hire without syncing the sheet">
+              Skip sheet & confirm
+            </button>
+          )}
           <button className="btn btn-primary" onClick={handleConfirm} disabled={saving}>
             {saving ? 'Saving…' : '✓ Confirm hire'}
           </button>
