@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import HireConfirmModal from './HireConfirmModal'
 import { useApp, avColor, initials, stageStyle, daysAgo, STAGES } from '../../context/AppContext'
 import { supabase } from '../../lib/supabase'
 
@@ -9,6 +10,7 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
   const [resumePreviewUrl, setResumePreviewUrl] = useState(null)
   const [resumeLoading, setResumeLoading] = useState(false)
   const [offerPreviewUrl, setOfferPreviewUrl] = useState(null)
+  const [hireApp, setHireApp] = useState(null)
   const [offerPreviewName, setOfferPreviewName] = useState('')
   const [offerPreviewLoading, setOfferPreviewLoading] = useState(null)
 
@@ -113,17 +115,18 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
 
   async function handleStageChange(app, newStage) {
     if (newStage === 'Hired') {
-      const job = jobs.find(j => j.id === app.job_id)
-      const jobTitle = job?.title || 'this role'
-      const confirmed = window.confirm(
-        `Moving to Hired will unpublish "${jobTitle}" from the careers page. Continue?`
-      )
-      if (!confirmed) return
-      await moveStage(app.id, 'Hired')
-      if (job) await updateJobStatus(job.id, 'Closed')
+      setHireApp(app)
     } else {
       await moveStage(app.id, newStage)
     }
+  }
+
+  async function handleHireConfirm() {
+    if (!hireApp) return
+    const job = jobs.find(j => j.id === hireApp.job_id)
+    await moveStage(hireApp.id, 'Hired')
+    if (job) await updateJobStatus(job.id, 'Closed')
+    setHireApp(null)
   }
 
   async function handleSaveNote() {
@@ -364,6 +367,17 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
           </div>
         </div>
       </div>
+
+      {/* Hire confirmation form */}
+      {hireApp && (
+        <HireConfirmModal
+          app={hireApp}
+          candidate={c}
+          job={jobs.find(j => j.id === hireApp.job_id)}
+          onCancel={() => setHireApp(null)}
+          onConfirm={handleHireConfirm}
+        />
+      )}
 
       {/* Reference PDF preview overlay */}
       {refPreviewUrl && (
