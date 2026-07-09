@@ -119,6 +119,39 @@ export default function Jobs({ onNavigate }) {
     setNoteText('')
   }
 
+  function downloadJobPDF(job) {
+    const w = window.open('', '_blank')
+    w.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>${job.title} — Job Description</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 720px; margin: 48px auto; color: #111; line-height: 1.7; padding: 0 32px; }
+    h1 { font-size: 26px; font-weight: 700; margin: 0 0 8px; }
+    .meta { color: #666; font-size: 14px; margin-bottom: 32px; display: flex; flex-wrap: wrap; gap: 16px; }
+    .meta span { display: flex; align-items: center; gap: 4px; }
+    hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+    .description { font-size: 15px; white-space: pre-wrap; color: #222; }
+    @media print { body { margin: 24px; } }
+  </style>
+</head>
+<body>
+  <h1>${job.title}</h1>
+  <div class="meta">
+    ${job.dept ? `<span>🏢 ${job.dept}</span>` : ''}
+    ${job.location ? `<span>📍 ${job.location}</span>` : ''}
+    ${job.employment_type ? `<span>⏱ ${job.employment_type}</span>` : ''}
+    ${job.salary ? `<span>💰 ${job.salary}</span>` : ''}
+  </div>
+  <hr/>
+  <div class="description">${(job.description || 'No description provided.').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+</body>
+</html>`)
+    w.document.close()
+    w.focus()
+    setTimeout(() => { w.print() }, 400)
+  }
+
   async function handleMoveStage(applicationId, stage) {
     await moveStage(applicationId, stage)
   }
@@ -162,6 +195,7 @@ export default function Jobs({ onNavigate }) {
           ) : null}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <button className="btn btn-sm" onClick={() => openModal('editJob', { job: selectedJob })}>Edit</button>
+            <button className="btn btn-sm" onClick={() => downloadJobPDF(selectedJob)}>↓ Download JD</button>
             {selectedJob.status === 'Closed' ? (
               <button className="btn btn-sm" onClick={() => { updateJobStatus(selectedJob.id, 'Active'); closeJobDetail() }}>Reopen</button>
             ) : (
@@ -496,6 +530,7 @@ export default function Jobs({ onNavigate }) {
                       ) : (
                         <>
                           <button className="btn btn-sm" style={{ marginRight: 4 }} onClick={() => openModal('publishJob', { jobId: j.id })}>Publish</button>
+                          <button className="btn btn-sm" style={{ marginRight: 4 }} onClick={e => { e.stopPropagation(); downloadJobPDF(j) }}>↓ JD</button>
                           <button className="btn btn-sm" style={{ marginRight: 4 }} onClick={() => updateJobStatus(j.id, j.status === 'Active' ? 'Paused' : 'Active')}>
                             {j.status === 'Active' ? 'Pause' : 'Activate'}
                           </button>
