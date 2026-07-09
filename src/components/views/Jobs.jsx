@@ -120,19 +120,26 @@ export default function Jobs({ onNavigate }) {
   }
 
   function downloadJobPDF(job) {
+    // Clean up TinyMCE artifacts and CSS variables that won't work outside the app
+    const cleanDesc = (job.description || '<p>No description provided.</p>')
+      .replace(/<!--.*?-->/gs, '')
+      .replace(/color:\s*var\([^)]+\)/g, 'color: #222')
+      .replace(/background-color:\s*var\([^)]+\)/g, 'background-color: transparent')
     const w = window.open('', '_blank')
     w.document.write(`<!DOCTYPE html>
 <html>
 <head>
   <title>${job.title} — Job Description</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 720px; margin: 48px auto; color: #111; line-height: 1.7; padding: 0 32px; }
-    h1 { font-size: 26px; font-weight: 700; margin: 0 0 8px; }
-    .meta { color: #666; font-size: 14px; margin-bottom: 32px; display: flex; flex-wrap: wrap; gap: 16px; }
-    .meta span { display: flex; align-items: center; gap: 4px; }
-    hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
-    .description { font-size: 15px; white-space: pre-wrap; color: #222; }
-    @media print { body { margin: 24px; } }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; max-width: 740px; margin: 48px auto; color: #111; line-height: 1.6; padding: 0 32px; }
+    h1 { font-size: 24px; font-weight: 700; margin: 0 0 6px; }
+    .meta { color: #555; font-size: 13px; margin-bottom: 28px; display: flex; flex-wrap: wrap; gap: 12px 20px; }
+    hr { border: none; border-top: 1px solid #ddd; margin: 20px 0; }
+    .description { font-size: 14px; color: #222; }
+    .description ul, .description ol { padding-left: 24px; }
+    .description p { margin: 6px 0; }
+    @media print { body { margin: 20px 32px; } }
   </style>
 </head>
 <body>
@@ -140,11 +147,11 @@ export default function Jobs({ onNavigate }) {
   <div class="meta">
     ${job.dept ? `<span>🏢 ${job.dept}</span>` : ''}
     ${job.location ? `<span>📍 ${job.location}</span>` : ''}
-    ${job.employment_type ? `<span>⏱ ${job.employment_type}</span>` : ''}
-    ${job.salary ? `<span>💰 ${job.salary}</span>` : ''}
+    ${job.employment_type ? `<span>${job.employment_type}</span>` : ''}
+    ${job.salary ? `<span>${job.salary}</span>` : ''}
   </div>
   <hr/>
-  <div class="description">${(job.description || 'No description provided.').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+  <div class="description">${cleanDesc}</div>
 </body>
 </html>`)
     w.document.close()
