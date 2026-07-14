@@ -32,7 +32,7 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
     setSaving(true)
     setError('')
     try {
-      const { error: fnErr } = await supabase.functions.invoke('sync-hired', { body: form })
+      const { error: fnErr } = await supabase.functions.invoke('sync-hired', { body: { ...form, candidateId: candidate.id } })
       if (fnErr) throw new Error(fnErr.message)
       await onConfirm()
     } catch (err) {
