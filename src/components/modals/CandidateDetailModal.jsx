@@ -43,7 +43,7 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
     setRefUploading(true)
     try {
       const path = `references/${candidateId}/${Date.now()}-${file.name}`
-      const { error: uploadErr } = await supabase.storage.from('references').upload(path, file)
+      const { error: uploadErr } = await supabase.storage.from('References').upload(path, file)
       if (uploadErr) throw uploadErr
       const { data, error } = await supabase.from('candidate_references').insert({
         candidate_id: candidateId,
@@ -63,7 +63,7 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
 
   async function handleViewReference(ref) {
     setRefPreviewLoading(ref.id)
-    const { data } = await supabase.storage.from('references').createSignedUrl(ref.file_path, 300)
+    const { data } = await supabase.storage.from('References').createSignedUrl(ref.file_path, 300)
     if (data?.signedUrl) {
       setRefPreviewName(ref.file_name)
       setRefPreviewUrl(data.signedUrl)
@@ -73,7 +73,7 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
 
   async function handleDeleteReference(ref) {
     if (!confirm(`Delete "${ref.file_name}"?`)) return
-    await supabase.storage.from('references').remove([ref.file_path])
+    await supabase.storage.from('References').remove([ref.file_path])
     await supabase.from('candidate_references').delete().eq('id', ref.id)
     setReferences(prev => prev.filter(r => r.id !== ref.id))
   }
