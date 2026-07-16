@@ -234,7 +234,7 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
                           </select>
                         </div>
                         {/* Screening question answers */}
-                        {(app.work_authorized !== null && app.work_authorized !== undefined || app.salary_expectations) && (
+                        {(app.work_authorized !== null && app.work_authorized !== undefined || app.salary_expectations || app.home_state) && (
                           <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                             {app.work_authorized !== null && app.work_authorized !== undefined && (
                               <span style={{
@@ -244,6 +244,11 @@ export default function CandidateDetailModal({ candidateId, onClose }) {
                                 fontWeight: 600,
                               }}>
                                 {app.work_authorized ? '✓ US work authorized' : '✗ Not US work authorized'}
+                              </span>
+                            )}
+                            {app.home_state && (
+                              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)' }}>
+                                📍 {app.home_state}
                               </span>
                             )}
                             {app.salary_expectations && (
