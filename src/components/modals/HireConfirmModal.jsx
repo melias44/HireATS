@@ -134,7 +134,7 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
           </div>
 
           <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
-            Confirming will move this candidate to <strong>Hired</strong>, close the job posting, and add a row to the <strong>Hire ATS — New Hires</strong> Google Sheet.
+            Confirming will move this candidate to <strong>Hired</strong>, close the job posting, and add a row to the <strong>HireME — New Hires</strong> Google Sheet.
           </div>
         </div>
 
