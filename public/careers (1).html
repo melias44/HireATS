@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Careers — Bustle Digital Group</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bdg-black: #0A0A0A;
+      --bdg-white: #FFFFFF;
+      --bdg-gray:  #F5F5F5;
+      --bdg-mid:   #6B6B6B;
+      --bdg-border: #E5E5E5;
+      --bdg-accent: #0A0A0A;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bdg-white);
+      color: var(--bdg-black);
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 1px solid var(--bdg-border);
+      padding: 0 48px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 100;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--bdg-black);
+      text-decoration: none;
+    }
+    .logo span { color: #888; font-weight: 400; margin-left: 6px; font-size: 14px; }
+
+    /* ── Hero ── */
+    .hero {
+      background: var(--bdg-black);
+      color: var(--bdg-white);
+      padding: 80px 48px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 52px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+    .hero p {
+      font-size: 17px;
+      color: #AAA;
+      max-width: 520px;
+      margin: 0 auto 32px;
+      line-height: 1.6;
+    }
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 48px;
+    }
+    .hero-stat { text-align: center; }
+    .hero-stat-num { font-size: 32px; font-weight: 800; color: #fff; }
+    .hero-stat-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+
+    /* ── Main layout ── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 60px 24px; }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 36px;
+      flex-wrap: wrap;
+    }
+    .filter-bar input, .filter-bar select {
+      height: 42px;
+      border: 1px solid var(--bdg-border);
+      border-radius: 8px;
+      padding: 0 14px;
+      font-size: 14px;
+      font-family: var(--font);
+      color: var(--bdg-black);
+      background: #fff;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .filter-bar input:focus, .filter-bar select:focus { border-color: #999; }
+    .filter-bar input { flex: 1; min-width: 200px; }
+
+    /* ── Jobs list ── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--bdg-mid);
+      margin-bottom: 16px;
+    }
+
+    .job-list { display: flex; flex-direction: column; gap: 1px; }
+
+    .job-card {
+      background: #fff;
+      border: 1px solid var(--bdg-border);
+      border-radius: 12px;
+      padding: 24px 28px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      margin-bottom: 10px;
+    }
+    .job-card:hover {
+      border-color: var(--bdg-black);
+      box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+    }
+    .job-card-body { flex: 1; }
+    .job-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .job-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .job-tag {
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: var(--bdg-gray);
+      color: var(--bdg-mid);
+      white-space: nowrap;
+    }
+    .apply-btn {
+      height: 40px;
+      padding: 0 22px;
+      background: var(--bdg-black);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: var(--font);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+      flex-shrink: 0;
+    }
+    .apply-btn:hover { opacity: 0.8; }
+
+    .empty-state {
+      text-align: center;
+      padding: 80px 24px;
+      color: var(--bdg-mid);
+    }
+    .empty-state h3 { font-size: 20px; margin-bottom: 8px; color: var(--bdg-black); }
+    .loading-state { text-align: center; padding: 60px; color: var(--bdg-mid); }
+
+    /* ── Apply drawer / overlay ── */
+    .drawer-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 200;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: all; }
+
+    .drawer {
+      position: fixed; top: 0; right: 0; bottom: 0;
+      width: 520px; max-width: 100vw;
+      background: #fff;
+      z-index: 201;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex; flex-direction: column;
+    }
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-head {
+      padding: 24px 28px 20px;
+      border-bottom: 1px solid var(--bdg-border);
+      position: sticky; top: 0; background: #fff; z-index: 1;
+    }
+    .drawer-close {
+      position: absolute; top: 20px; right: 20px;
+      width: 32px; height: 32px;
+      border: 1px solid var(--bdg-border);
+      border-radius: 50%;
+      background: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--bdg-mid);
+      transition: background 0.1s;
+    }
+    .drawer-close:hover { background: var(--bdg-gray); }
+
+    .drawer-job-title { font-size: 20px; font-weight: 800; margin-bottom: 6px; padding-right: 40px; }
+    .drawer-job-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .drawer-body { padding: 28px; flex: 1; }
+
+    /* Job description */
+    .job-description {
+      font-size: 14px;
+      color: #444;
+      line-height: 1.7;
+      margin-bottom: 28px;
+    }
+    .job-description ul, .job-description ol { padding-left: 20px; margin: 8px 0; }
+    .job-description li { margin: 4px 0; }
+    .job-description h2 { font-size: 16px; font-weight: 700; margin: 14px 0 6px; color: #111; }
+    .job-description h3 { font-size: 14px; font-weight: 700; margin: 12px 0 4px; color: #111; }
+    .job-description p  { margin: 6px 0; }
+
+    .section-divider {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--bdg-mid);
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--bdg-border);
+    }
+
+    /* Form */
+    .form-group { margin-bottom: 18px; }
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--bdg-black);
+    }
+    .form-label .req { color: #C0392B; margin-left: 2px; }
+    .form-label .opt { color: var(--bdg-mid); font-weight: 400; margin-left: 4px; font-size: 12px; }
+
+    .form-input {
+      width: 100%;
+      height: 42px;
+      border: 1px solid var(--bdg-border);
+      border-radius: 8px;
+      padding: 0 14px;
+      font-size: 14px;
+      font-family: var(--font);
+      color: var(--bdg-black);
+      outline: none;
+      transition: border-color 0.15s;
+      background: #fff;
+    }
+    .form-input:focus { border-color: var(--bdg-black); }
+    .form-input.error { border-color: #C0392B; }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    .radio-group { display: flex; gap: 16px; }
+    .radio-label {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 14px; cursor: pointer;
+      padding: 10px 16px;
+      border: 1px solid var(--bdg-border);
+      border-radius: 8px;
+      flex: 1;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .radio-label:has(input:checked) {
+      border-color: var(--bdg-black);
+      background: var(--bdg-gray);
+      font-weight: 600;
+    }
+
+    .file-input-wrap {
+      position: relative;
+    }
+    .file-input-wrap input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .file-drop {
+      border: 2px dashed var(--bdg-border);
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      transition: border-color 0.15s, background 0.15s;
+      cursor: pointer;
+    }
+    .file-drop:hover, .file-drop.has-file {
+      border-color: var(--bdg-black);
+      background: var(--bdg-gray);
+    }
+    .file-drop-icon { font-size: 28px; margin-bottom: 6px; }
+    .file-drop-text { font-size: 13px; color: var(--bdg-mid); }
+    .file-drop-name { font-size: 13px; font-weight: 600; color: var(--bdg-black); margin-top: 4px; }
+
+    .form-error { font-size: 12px; color: #C0392B; margin-top: 5px; }
+
+    .submit-btn {
+      width: 100%;
+      height: 48px;
+      background: var(--bdg-black);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: var(--font);
+      cursor: pointer;
+      margin-top: 24px;
+      transition: opacity 0.15s;
+    }
+    .submit-btn:hover:not(:disabled) { opacity: 0.8; }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .submit-note {
+      text-align: center;
+      font-size: 12px;
+      color: var(--bdg-mid);
+      margin-top: 12px;
+    }
+
+    /* Success state */
+    .success-state {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; text-align: center;
+      padding: 60px 32px; flex: 1;
+    }
+    .success-icon { font-size: 56px; margin-bottom: 20px; }
+    .success-title { font-size: 24px; font-weight: 800; margin-bottom: 10px; }
+    .success-sub { font-size: 15px; color: var(--bdg-mid); line-height: 1.6; max-width: 320px; }
+    .success-back {
+      margin-top: 28px;
+      padding: 12px 28px;
+      background: transparent;
+      border: 1px solid var(--bdg-border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .success-back:hover { background: var(--bdg-gray); }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--bdg-border);
+      padding: 32px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--bdg-mid);
+      font-size: 13px;
+    }
+    .footer-brands { display: flex; gap: 16px; flex-wrap: wrap; }
+    .footer-brand { font-size: 12px; font-weight: 600; }
+
+    @media (max-width: 640px) {
+      header { padding: 0 20px; }
+      .hero { padding: 52px 20px; }
+      .hero h1 { font-size: 36px; }
+      .hero-stats { gap: 28px; }
+      .page { padding: 40px 16px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .drawer { width: 100%; }
+      footer { flex-direction: column; gap: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <a class="logo" href="#">BDG <span>Bustle Digital Group</span></a>
+</header>
+
+<!-- Hero -->
+<div class="hero">
+  <h1>Join Our Team</h1>
+  <p>We're building the future of digital media. Come work with us across Bustle, Inverse, NYLON, Fatherly, and more.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hero-stat-num" id="total-jobs">—</div>
+      <div class="hero-stat-label">Open roles</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-num">8</div>
+      <div class="hero-stat-label">Brands</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-num">NYC</div>
+      <div class="hero-stat-label">Headquarters</div>
+    </div>
+  </div>
+</div>
+
+<!-- Jobs -->
+<div class="page">
+  <div class="filter-bar">
+    <input type="text" id="search" placeholder="Search roles…" />
+    <select id="dept-filter">
+      <option value="">All departments</option>
+    </select>
+    <select id="type-filter">
+      <option value="">All types</option>
+      <option value="Full-time">Full-time</option>
+      <option value="Part-time">Part-time</option>
+      <option value="Contract">Contract</option>
+    </select>
+  </div>
+
+  <div class="section-label" id="jobs-label">Loading open roles…</div>
+  <div class="job-list" id="job-list">
+    <div class="loading-state">Fetching open roles…</div>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <div>© 2026 Bustle Digital Group. All rights reserved.</div>
+  <div class="footer-brands">
+    <span class="footer-brand">Bustle</span>
+    <span class="footer-brand">Inverse</span>
+    <span class="footer-brand">NYLON</span>
+    <span class="footer-brand">Fatherly</span>
+    <span class="footer-brand">Scary Mommy</span>
+    <span class="footer-brand">Elite Daily</span>
+    <span class="footer-brand">The Zoe Report</span>
+    <span class="footer-brand">W Magazine</span>
+  </div>
+</footer>
+
+<!-- Apply drawer -->
+<div class="drawer-overlay" id="overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head" id="drawer-head"></div>
+  <div class="drawer-body" id="drawer-body"></div>
+</div>
+
+<script>
+  // ── Config ──────────────────────────────────────────────────────────────
+  const SUPABASE_URL  = 'https://tdtvactpmkzvnlufsosk.supabase.co'
+  const ANON_KEY      = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkdHZhY3RwbWt6dm5sdWZzb3NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI0OTkxMzksImV4cCI6MjA1ODA3NTEzOX0.5J7L5LCslt_iBc3iNqf47MGPoBHmHl5Np7jUTcGw6r0'
+  const SUBMIT_URL    = `${SUPABASE_URL}/functions/v1/submit-application`
+
+  const US_STATES = [
+    'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut',
+    'Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa',
+    'Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan',
+    'Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire',
+    'New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio',
+    'Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota',
+    'Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia',
+    'Wisconsin','Wyoming','Washington D.C.'
+  ]
+
+  let allJobs = []
+  let activeJob = null
+
+  // ── Fetch jobs ───────────────────────────────────────────────────────────
+  async function fetchJobs() {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/jobs?status=eq.Active&select=id,title,dept,location,employment_type,salary,description,posted_at&order=posted_at.desc`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' } }
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        console.error('Jobs fetch error:', data)
+        allJobs = []
+      } else {
+        allJobs = Array.isArray(data) ? data : []
+      }
+    } catch (e) {
+      console.error('Jobs fetch exception:', e)
+      allJobs = []
+    }
+    populateDeptFilter()
+    renderJobs()
+  }
+
+  function populateDeptFilter() {
+    const depts = [...new Set(allJobs.map(j => j.dept).filter(Boolean))].sort()
+    const sel = document.getElementById('dept-filter')
+    depts.forEach(d => {
+      const o = document.createElement('option')
+      o.value = d; o.textContent = d
+      sel.appendChild(o)
+    })
+  }
+
+  function renderJobs() {
+    const search = document.getElementById('search').value.toLowerCase()
+    const dept   = document.getElementById('dept-filter').value
+    const type   = document.getElementById('type-filter').value
+
+    let filtered = allJobs.filter(j => {
+      if (search && !`${j.title} ${j.dept} ${j.location}`.toLowerCase().includes(search)) return false
+      if (dept && j.dept !== dept) return false
+      if (type && j.employment_type !== type) return false
+      return true
+    })
+
+    document.getElementById('total-jobs').textContent = allJobs.length
+    document.getElementById('jobs-label').textContent =
+      filtered.length === 0 ? 'No roles match your search' :
+      `${filtered.length} open role${filtered.length !== 1 ? 's' : ''}`
+
+    const list = document.getElementById('job-list')
+    if (filtered.length === 0) {
+      list.innerHTML = `<div class="empty-state"><h3>No roles found</h3><p>Try adjusting your search or check back soon.</p></div>`
+      return
+    }
+
+    list.innerHTML = filtered.map(job => `
+      <div class="job-card" onclick="openDrawer('${job.id}')">
+        <div class="job-card-body">
+          <div class="job-title">${esc(job.title)}</div>
+          <div class="job-meta">
+            ${job.dept ? `<span class="job-tag">${esc(job.dept)}</span>` : ''}
+            ${job.location ? `<span class="job-tag">📍 ${esc(job.location)}</span>` : ''}
+            ${job.employment_type ? `<span class="job-tag">${esc(job.employment_type)}</span>` : ''}
+            ${job.salary && job.salary !== 'TBD' ? `<span class="job-tag">💰 ${esc(job.salary)}</span>` : ''}
+          </div>
+        </div>
+        <button class="apply-btn" onclick="event.stopPropagation(); openDrawer('${job.id}')">Apply now</button>
+      </div>
+    `).join('')
+  }
+
+  // ── Drawer ───────────────────────────────────────────────────────────────
+  function openDrawer(jobId) {
+    activeJob = allJobs.find(j => j.id === jobId)
+    if (!activeJob) return
+    renderDrawer()
+    document.getElementById('overlay').classList.add('open')
+    document.getElementById('drawer').classList.add('open')
+    document.body.style.overflow = 'hidden'
+  }
+
+  function closeDrawer() {
+    document.getElementById('overlay').classList.remove('open')
+    document.getElementById('drawer').classList.remove('open')
+    document.body.style.overflow = ''
+    activeJob = null
+  }
+
+  function renderDrawer() {
+    const j = activeJob
+    document.getElementById('drawer-head').innerHTML = `
+      <button class="drawer-close" onclick="closeDrawer()">×</button>
+      <div class="drawer-job-title">${esc(j.title)}</div>
+      <div class="drawer-job-meta">
+        ${j.dept ? `<span class="job-tag">${esc(j.dept)}</span>` : ''}
+        ${j.location ? `<span class="job-tag">📍 ${esc(j.location)}</span>` : ''}
+        ${j.employment_type ? `<span class="job-tag">${esc(j.employment_type)}</span>` : ''}
+        ${j.salary && j.salary !== 'TBD' ? `<span class="job-tag">💰 ${esc(j.salary)}</span>` : ''}
+      </div>
+    `
+
+    const stateOptions = US_STATES.map(s => `<option value="${s}">${s}</option>`).join('')
+
+    document.getElementById('drawer-body').innerHTML = `
+      ${j.description ? `
+        <div class="job-description">${j.description}</div>
+        <div style="border-top:1px solid var(--bdg-border);margin-bottom:24px;"></div>
+      ` : ''}
+
+      <div class="section-divider">Apply for this role</div>
+
+      <form id="apply-form" novalidate>
+        <input type="hidden" name="job_id" value="${j.id}" />
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">First name <span class="req">*</span></label>
+            <input class="form-input" type="text" name="first_name" placeholder="Jane" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Last name <span class="req">*</span></label>
+            <input class="form-input" type="text" name="last_name" placeholder="Smith" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email address <span class="req">*</span></label>
+          <input class="form-input" type="email" name="email" placeholder="jane@email.com" required />
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Phone <span class="opt">(optional)</span></label>
+            <input class="form-input" type="tel" name="phone" placeholder="+1 (212) 555-0100" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Salary expectations <span class="opt">(optional)</span></label>
+            <input class="form-input" type="text" name="salary_expectations" placeholder="e.g. $120K – $140K" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">LinkedIn profile <span class="opt">(optional)</span></label>
+          <input class="form-input" type="url" name="linkedin_url" placeholder="https://linkedin.com/in/yourname" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Are you authorized to work in the United States? <span class="req">*</span></label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="work_authorized" value="yes" required />
+              Yes
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="work_authorized" value="no" />
+              No
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">What state do you currently live in? <span class="req">*</span></label>
+          <select class="form-input" name="home_state" required>
+            <option value="">Select your state…</option>
+            ${stateOptions}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Resume <span class="opt">(PDF or Word, max 10MB)</span></label>
+          <div class="file-input-wrap">
+            <div class="file-drop" id="file-drop">
+              <div class="file-drop-icon">📄</div>
+              <div class="file-drop-text">Click to upload or drag and drop</div>
+              <div class="file-drop-name" id="file-name" style="display:none"></div>
+            </div>
+            <input type="file" name="resume" accept=".pdf,.doc,.docx" onchange="handleFileChange(this)" />
+          </div>
+        </div>
+
+        <div id="form-error" style="display:none;color:#C0392B;font-size:13px;margin-top:8px;padding:10px 14px;background:#FEF2F2;border-radius:8px;"></div>
+
+        <button type="submit" class="submit-btn" id="submit-btn">Submit application</button>
+        <div class="submit-note">By applying, you agree to our privacy policy. Your information will only be used in the hiring process.</div>
+      </form>
+    `
+
+    document.getElementById('apply-form').addEventListener('submit', handleSubmit)
+  }
+
+  function handleFileChange(input) {
+    const file = input.files[0]
+    const drop = document.getElementById('file-drop')
+    const name = document.getElementById('file-name')
+    if (file) {
+      drop.classList.add('has-file')
+      name.style.display = 'block'
+      name.textContent = '✓ ' + file.name
+      document.querySelector('.file-drop-text').style.display = 'none'
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    const form = e.target
+    const btn  = document.getElementById('submit-btn')
+    const errEl = document.getElementById('form-error')
+
+    // Basic validation
+    const firstName = form.first_name.value.trim()
+    const lastName  = form.last_name.value.trim()
+    const email     = form.email.value.trim()
+    const workAuth  = form.work_authorized.value
+    const homeState = form.home_state.value
+
+    if (!firstName || !lastName || !email || !workAuth || !homeState) {
+      errEl.textContent = 'Please fill in all required fields.'
+      errEl.style.display = 'block'
+      return
+    }
+
+    errEl.style.display = 'none'
+    btn.disabled = true
+    btn.textContent = 'Submitting…'
+
+    const formData = new FormData(form)
+
+    try {
+      const res  = await fetch(SUBMIT_URL, { method: 'POST', body: formData })
+      const data = await res.json()
+
+      if (data.success) {
+        // Show success state
+        document.getElementById('drawer-body').innerHTML = `
+          <div class="success-state">
+            <div class="success-icon">🎉</div>
+            <div class="success-title">Application received!</div>
+            <div class="success-sub">${data.message || 'Thank you for applying. Our team will be in touch if your background is a match.'}</div>
+            <button class="success-back" onclick="closeDrawer()">← Browse more roles</button>
+          </div>
+        `
+      } else {
+        errEl.textContent = data.error || 'Something went wrong. Please try again.'
+        errEl.style.display = 'block'
+        btn.disabled = false
+        btn.textContent = 'Submit application'
+      }
+    } catch (err) {
+      errEl.textContent = 'Connection error. Please check your internet and try again.'
+      errEl.style.display = 'block'
+      btn.disabled = false
+      btn.textContent = 'Submit application'
+    }
+  }
+
+  // ── Utils ────────────────────────────────────────────────────────────────
+  function esc(str) {
+    if (!str) return ''
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+  }
+
+  // ── Keyboard close ───────────────────────────────────────────────────────
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer() })
+
+  // ── Filter listeners ─────────────────────────────────────────────────────
+  document.getElementById('search').addEventListener('input', renderJobs)
+  document.getElementById('dept-filter').addEventListener('change', renderJobs)
+  document.getElementById('type-filter').addEventListener('change', renderJobs)
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  fetchJobs()
+</script>
+</body>
+</html>
