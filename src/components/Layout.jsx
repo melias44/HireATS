@@ -42,7 +42,7 @@ export default function Layout() {
     <>
       <nav className="sidebar">
         <div className="sidebar-logo">
-          <div className="logo-mark">Hire<span>.</span></div>
+          <div className="logo-mark">HireME<span>.</span></div>
           <div className="logo-sub">Applicant Tracking System</div>
         </div>
         <div className="sidebar-nav">
