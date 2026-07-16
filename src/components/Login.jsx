@@ -50,7 +50,7 @@ export default function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="login-logo">Hire<span>.</span></div>
+        <div className="login-logo">HireME<span>.</span></div>
         <div className="login-sub">
           {mode === 'login' && 'Sign in to your HR workspace'}
           {mode === 'signup' && 'Create an account'}
