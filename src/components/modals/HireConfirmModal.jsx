@@ -19,6 +19,7 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
     bonus:          '',
     commission:     '',
     employmentType: 'Full Time',
+    homeState:      app.home_state || '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
@@ -131,6 +132,14 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
                 <option value="Part Time">Part Time</option>
               </select>
             </div>
+          </div>
+
+          <div className="form-grid">
+            <div className="form-row">
+              <label className="form-label">Home state (tax)</label>
+              <input className="form-input" placeholder="e.g. New York" value={form.homeState} onChange={e => set('homeState', e.target.value)} />
+            </div>
+            <div className="form-row" />
           </div>
 
           <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
