@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { supabase } from '../../lib/supabase'
 
+const DEPARTMENTS = ['Edit','Editorial Design','Sales','Corporate','Sales Planning','Brand Strategy','HR','Marketing','Social','PR','Video','Affiliate','Branded Design','Engineering','Branded Content','Production','Account Management','Legal','Finance','IT','Experiential','NYLON Membership']
+const BRANDS = ['BDG','Bustle','W','Elite Daily','Scary Mommy','Inverse','Nylon','TZR']
+
 export default function HireConfirmModal({ app, candidate, job, onCancel, onConfirm }) {
   const { offers } = useApp()
 
@@ -12,6 +15,8 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
     name:           `${candidate.fname} ${candidate.lname}`,
     email:          candidate.email || '',
     jobTitle:       job?.title || '',
+    department:     '',
+    brand:          '',
     manager:        '',
     startDate:      linkedOffer?.start_date || '',
     location:       candidate.location || '',
@@ -29,6 +34,8 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
   }
 
   async function handleConfirm() {
+    if (!form.department) { setError('Department is required.'); return }
+    if (!form.brand) { setError('Brand is required.'); return }
     if (!form.manager.trim()) { setError('Manager is required.'); return }
     setSaving(true)
     setError('')
@@ -95,6 +102,23 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
                 onChange={e => set('manager', e.target.value)}
                 style={!form.manager.trim() && error ? { borderColor: '#EF4444' } : {}}
               />
+            </div>
+          </div>
+
+          <div className="form-grid">
+            <div className="form-row">
+              <label className="form-label">Department *</label>
+              <select className="form-input" value={form.department} onChange={e => set('department', e.target.value)} style={!form.department && error ? { borderColor: '#EF4444' } : {}}>
+                <option value="">Select department…</option>
+                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div className="form-row">
+              <label className="form-label">Brand *</label>
+              <select className="form-input" value={form.brand} onChange={e => set('brand', e.target.value)} style={!form.brand && error ? { borderColor: '#EF4444' } : {}}>
+                <option value="">Select brand…</option>
+                {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
             </div>
           </div>
 
