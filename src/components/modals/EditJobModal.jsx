@@ -3,13 +3,19 @@ import { useApp } from '../../context/AppContext'
 import { callAI } from '../../lib/supabase'
 import RichTextEditor, { plainToHtml } from '../RichTextEditor'
 
+function formatMoney(val) {
+  if (!val) return ''
+  const stripped = String(val).replace(/^\$/, '')
+  return stripped ? '$' + stripped : ''
+}
+
 export default function EditJobModal({ job, onClose }) {
   const { updateJob, team } = useApp()
   const [title, setTitle] = useState(job.title || '')
   const [dept, setDept] = useState(job.dept || 'Engineering')
   const [location, setLocation] = useState(job.location || '')
   const [empType, setEmpType] = useState(job.employment_type || 'Full-time')
-  const [salary, setSalary] = useState(job.salary || '')
+  const [salary, setSalary] = useState(formatMoney(job.salary || ''))
   const [description, setDescription] = useState(job.description || '')
   const [hiringManagerId, setHiringManagerId] = useState(job.hiring_manager_id || '')
   const [saving, setSaving] = useState(false)
@@ -97,7 +103,7 @@ export default function EditJobModal({ job, onClose }) {
             </div>
             <div className="form-row">
               <label className="form-label">Salary range</label>
-              <input className="form-input" value={salary} onChange={e => setSalary(e.target.value)} placeholder="$120,000 – $150,000" />
+              <input className="form-input" value={salary} onChange={e => setSalary(formatMoney(e.target.value))} placeholder="$120,000 – $150,000" />
             </div>
           </div>
 
