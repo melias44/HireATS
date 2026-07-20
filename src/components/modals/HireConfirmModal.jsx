@@ -5,6 +5,12 @@ import { supabase } from '../../lib/supabase'
 const DEPARTMENTS = ['Edit','Editorial Design','Sales','Corporate','Sales Planning','Brand Strategy','HR','Marketing','Social','PR','Video','Affiliate','Branded Design','Engineering','Branded Content','Production','Account Management','Legal','Finance','IT','Experiential','NYLON Membership']
 const BRANDS = ['BDG','Bustle','W','Elite Daily','Scary Mommy','Inverse','Nylon','TZR']
 
+function formatMoney(val) {
+  if (!val) return ''
+  const stripped = String(val).replace(/^\$/, '')
+  return stripped ? '$' + stripped : ''
+}
+
 export default function HireConfirmModal({ app, candidate, job, onCancel, onConfirm }) {
   const { offers } = useApp()
 
@@ -20,7 +26,7 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
     manager:        '',
     startDate:      linkedOffer?.start_date || '',
     location:       candidate.location || '',
-    salary:         linkedOffer?.salary || '',
+    salary:         formatMoney(linkedOffer?.salary || ''),
     bonus:          '',
     commission:     '',
     employmentType: 'Full Time',
@@ -136,18 +142,18 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
           <div className="form-grid">
             <div className="form-row">
               <label className="form-label">Salary</label>
-              <input className="form-input" placeholder="e.g. $95,000" value={form.salary} onChange={e => set('salary', e.target.value)} />
+              <input className="form-input" placeholder="e.g. $95,000" value={form.salary} onChange={e => set('salary', formatMoney(e.target.value))} />
             </div>
             <div className="form-row">
               <label className="form-label">Annual bonus</label>
-              <input className="form-input" placeholder="e.g. $5,000 or N/A" value={form.bonus} onChange={e => set('bonus', e.target.value)} />
+              <input className="form-input" placeholder="e.g. $5,000 or N/A" value={form.bonus} onChange={e => set('bonus', formatMoney(e.target.value))} />
             </div>
           </div>
 
           <div className="form-grid">
             <div className="form-row">
               <label className="form-label">Commission</label>
-              <input className="form-input" placeholder="e.g. $10,000 or N/A" value={form.commission} onChange={e => set('commission', e.target.value)} />
+              <input className="form-input" placeholder="e.g. $10,000 or N/A" value={form.commission} onChange={e => set('commission', formatMoney(e.target.value))} />
             </div>
             <div className="form-row">
               <label className="form-label">Employment type</label>
