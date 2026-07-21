@@ -3,6 +3,8 @@ import { useApp } from '../../context/AppContext'
 import { callAI } from '../../lib/supabase'
 import RichTextEditor, { plainToHtml } from '../RichTextEditor'
 
+const LOCATIONS = ['Remote', 'Hybrid in NYC', 'Hybrid in LA', 'Hybrid in Chicago']
+
 function formatMoney(val) {
   if (!val) return ''
   const stripped = String(val).replace(/^\$/, '')
@@ -13,7 +15,7 @@ export default function EditJobModal({ job, onClose }) {
   const { updateJob, team } = useApp()
   const [title, setTitle] = useState(job.title || '')
   const [dept, setDept] = useState(job.dept || 'Engineering')
-  const [location, setLocation] = useState(job.location || '')
+  const [location, setLocation] = useState(LOCATIONS.includes(job.location) ? job.location : 'Remote')
   const [empType, setEmpType] = useState(job.employment_type || 'Full-time')
   const [salary, setSalary] = useState(formatMoney(job.salary || ''))
   const [description, setDescription] = useState(job.description || '')
@@ -90,7 +92,9 @@ export default function EditJobModal({ job, onClose }) {
             </div>
             <div className="form-row">
               <label className="form-label">Location</label>
-              <input className="form-input" value={location} onChange={e => setLocation(e.target.value)} placeholder="Remote / New York, NY" />
+              <select className="form-input" value={location} onChange={e => setLocation(e.target.value)}>
+                {LOCATIONS.map(l => <option key={l}>{l}</option>)}
+              </select>
             </div>
           </div>
 
