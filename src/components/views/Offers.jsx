@@ -17,7 +17,7 @@ function dsStatus(raw) {
 }
 
 export default function Offers() {
-  const { offers, offerTemplates, candidates, jobs, updateOfferStatus, uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, downloadSignedOffer, openModal, reload } = useApp()
+  const { offers, offerTemplates, candidates, jobs, updateOfferStatus, uploadOfferTemplate, deleteOfferTemplate, sendOfferViaDocuSign, downloadSignedOffer, openModal, reload, isAdmin } = useApp()
   const [tab, setTab] = useState('offers') // 'offers' | 'templates'
   const [sendingId, setSendingId] = useState(null)
   const [sendModal, setSendModal] = useState(null) // offer object
@@ -144,7 +144,7 @@ export default function Offers() {
                           <span className="status-pill" style={{ background: ds.bg, color: ds.color }}>{ds.label}</span>
                         </td>
                         <td style={{ whiteSpace: 'nowrap' }}>
-                          {o.signed_document_path && (
+                          {isAdmin && o.signed_document_path && (
                             <button
                               className="btn btn-sm"
                               style={{ marginRight: 4, background: 'var(--green-bg)', color: 'var(--green-text)', borderColor: '#BBF7D0' }}
