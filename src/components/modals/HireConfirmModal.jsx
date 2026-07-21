@@ -158,8 +158,7 @@ export default function HireConfirmModal({ app, candidate, job, onCancel, onConf
             <div className="form-row">
               <label className="form-label">Employment type</label>
               <select className="form-input" value={form.employmentType} onChange={e => set('employmentType', e.target.value)}>
-                <option value="Full Time">Full Time</option>
-                <option value="Part Time">Part Time</option>
+                {['Full Time', 'Part Time', 'Temp Part Time', 'Temp Full Time', 'Intern'].map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
           </div>
