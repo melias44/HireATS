@@ -32,9 +32,33 @@ const VIEWS = {
 
 export default function Layout() {
   const [view, setView] = useState('dashboard')
-  const { activeCandidates, activeJobs, pendingOffers, modal, openModal, closeModal, user } = useApp()
+  const { activeCandidates, activeJobs, pendingOffers, modal, openModal, closeModal, user, unauthorized } = useApp()
 
   const ViewComponent = VIEWS[view]?.component || Dashboard
+
+  if (unauthorized) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', height: '100vh', gap: 16, textAlign: 'center',
+        background: 'var(--bg)', color: 'var(--text-1)',
+      }}>
+        <div style={{ fontSize: 40 }}>🔒</div>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>Access denied</div>
+        <div style={{ fontSize: 14, color: 'var(--text-3)', maxWidth: 360 }}>
+          <strong>{user.email}</strong> hasn't been added to HireME yet.
+          <br />Contact your admin to get access.
+        </div>
+        <button
+          className="btn"
+          onClick={() => supabase.auth.signOut()}
+          style={{ marginTop: 8 }}
+        >
+          Sign out
+        </button>
+      </div>
+    )
+  }
 
   return (
     <>
