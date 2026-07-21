@@ -8,7 +8,6 @@ import Schedule from './views/Schedule'
 import Offers from './views/Offers'
 import Reports from './views/Reports'
 import Search from './views/Search'
-import AllCandidates from './views/AllCandidates'
 import Settings from './views/Settings'
 import AddCandidateModal from './modals/AddCandidateModal'
 import AddJobModal from './modals/AddJobModal'
@@ -23,7 +22,6 @@ import EditJobModal from './modals/EditJobModal'
 const VIEWS = {
   dashboard:     { label: 'Dashboard',          component: Dashboard },
   pipeline:      { label: 'Candidate pipeline', component: Pipeline },
-  allCandidates: { label: 'All candidates',      component: AllCandidates },
   jobs:          { label: 'Job postings',        component: Jobs },
   schedule:      { label: 'Interview schedule',  component: Schedule },
   search:        { label: 'Search candidates',   component: Search },
@@ -34,7 +32,7 @@ const VIEWS = {
 
 export default function Layout() {
   const [view, setView] = useState('dashboard')
-  const { candidates, activeCandidates, activeJobs, pendingOffers, modal, openModal, closeModal, user } = useApp()
+  const { activeCandidates, activeJobs, pendingOffers, modal, openModal, closeModal, user } = useApp()
 
   const ViewComponent = VIEWS[view]?.component || Dashboard
 
@@ -49,7 +47,6 @@ export default function Layout() {
           <div className="nav-section">Recruiting</div>
           <NavItem icon={<GridIcon />} label="Dashboard" active={view === 'dashboard'} onClick={() => setView('dashboard')} />
           <NavItem icon={<PipelineIcon />} label="Pipeline" active={view === 'pipeline'} onClick={() => setView('pipeline')} badge={activeCandidates.length || null} />
-          <NavItem icon={<PeopleIcon />} label="All candidates" active={view === 'allCandidates'} onClick={() => setView('allCandidates')} badge={candidates.length || null} />
           <NavItem icon={<BriefcaseIcon />} label="Job postings" active={view === 'jobs'} onClick={() => setView('jobs')} badge={activeJobs.length || null} />
           <NavItem icon={<CalendarIcon />} label="Interviews" active={view === 'schedule'} onClick={() => setView('schedule')} />
           <NavItem icon={<SearchIcon />} label="Search" active={view === 'search'} onClick={() => setView('search')} />
@@ -114,9 +111,6 @@ function GridIcon() {
 }
 function PipelineIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0 0h18"/></svg>
-}
-function PeopleIcon() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
 }
 function BriefcaseIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
