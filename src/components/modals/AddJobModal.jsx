@@ -5,11 +5,19 @@ import RichTextEditor, { plainToHtml } from '../RichTextEditor'
 
 const EEO_BOILERPLATE = `BDG Media Inc. is proud to be an equal opportunity workplace. All qualified applicants will receive consideration for employment without regard to, and will not be discriminated against based on age, race, gender, color, religion, national origin, sexual orientation, gender identity, veteran status, disability, or any other protected category.`
 
+const LOCATIONS = ['Remote', 'Hybrid in NYC', 'Hybrid in LA', 'Hybrid in Chicago']
+
+function formatMoney(val) {
+  if (!val) return ''
+  const stripped = String(val).replace(/^\$/, '')
+  return stripped ? '$' + stripped : ''
+}
+
 export default function AddJobModal({ onClose, onCreated }) {
   const { addJob, team } = useApp()
   const [title, setTitle] = useState('')
   const [dept, setDept] = useState('Engineering')
-  const [location, setLocation] = useState('')
+  const [location, setLocation] = useState('Remote')
   const [empType, setEmpType] = useState('Full-time')
   const [salary, setSalary] = useState('')
   const [description, setDescription] = useState('')
@@ -28,7 +36,6 @@ export default function AddJobModal({ onClose, onCreated }) {
       const text = await callAI(
         `Write a concise, compelling job description for a ${title} role in the ${dept} department${salary ? ' with salary range ' + salary : ''}. Include: 2-3 sentence overview, 4-5 key responsibilities (bullet points), 4-5 requirements (bullet points). Keep it professional but human. No fluff.`
       )
-      // Convert plain text to HTML so the rich editor renders it properly
       setDescription(plainToHtml(text))
     } catch (err) {
       setError('AI generation failed — make sure the Edge Function is deployed.')
@@ -42,13 +49,12 @@ export default function AddJobModal({ onClose, onCreated }) {
     setSaving(true)
     setError('')
     try {
-      // Append EEO boilerplate as plain paragraph after the HTML body
       const fullDescription = description
         ? `${description}<p style="margin-top:16px;font-size:13px;color:#666;">${EEO_BOILERPLATE}</p>`
         : `<p>${EEO_BOILERPLATE}</p>`
       const job = await addJob({
         title, dept,
-        location: location || 'Remote',
+        location,
         employment_type: empType,
         salary: salary || 'TBD',
         description: fullDescription,
@@ -90,7 +96,9 @@ export default function AddJobModal({ onClose, onCreated }) {
             </div>
             <div className="form-row">
               <label className="form-label">Location</label>
-              <input className="form-input" value={location} onChange={e => setLocation(e.target.value)} placeholder="Remote / New York, NY" />
+              <select className="form-input" value={location} onChange={e => setLocation(e.target.value)}>
+                {LOCATIONS.map(l => <option key={l}>{l}</option>)}
+              </select>
             </div>
           </div>
 
@@ -103,7 +111,7 @@ export default function AddJobModal({ onClose, onCreated }) {
             </div>
             <div className="form-row">
               <label className="form-label">Salary range</label>
-              <input className="form-input" value={salary} onChange={e => setSalary(e.target.value)} placeholder="$120,000 – $150,000" />
+              <input className="form-input" value={salary} onChange={e => setSalary(formatMoney(e.target.value))} placeholder="$120,000 – $150,000" />
             </div>
           </div>
 
@@ -129,7 +137,6 @@ export default function AddJobModal({ onClose, onCreated }) {
               onChange={setDescription}
               placeholder="Describe the role, responsibilities, and requirements…"
             />
-            {/* EEO boilerplate — locked, always appended on save */}
             <div style={{
               border: '1px solid var(--border)',
               borderTop: 'none',
