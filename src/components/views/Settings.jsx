@@ -8,6 +8,8 @@ const ROLE_STYLES = {
   hiring_manager:  { bg: '#FFF7ED', color: '#C2410C', label: 'Hiring Mgr' },
 }
 
+const APP_URL = window.location.origin
+
 export default function Settings() {
   const { team, candidates, inviteTeamMember, updateTeamMemberRole, updateCandidateResumeText, isAdmin, user } = useApp()
 
@@ -83,6 +85,7 @@ export default function Settings() {
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState('')
   const [inviteSuccess, setInviteSuccess] = useState('')
+  const [copied, setCopied] = useState(false)
 
   async function handleInvite() {
     if (!inviteEmail.trim()) { setInviteError('Enter an email address.'); return }
@@ -91,15 +94,21 @@ export default function Settings() {
     setInviteSuccess('')
     try {
       await inviteTeamMember(inviteEmail.trim(), inviteRole, inviteName.trim())
-      setInviteSuccess(`Invite sent to ${inviteEmail.trim()}!`)
+      setInviteSuccess(inviteEmail.trim())
       setInviteEmail('')
       setInviteName('')
       setInviteRole('member')
     } catch (err) {
-      setInviteError(err.message || 'Failed to send invite.')
+      setInviteError(err.message || 'Failed to add team member.')
     } finally {
       setInviting(false)
     }
+  }
+
+  function copyUrl() {
+    navigator.clipboard.writeText(APP_URL)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   return (
@@ -197,11 +206,11 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Invite */}
+      {/* Add team member */}
       {isAdmin && (
         <div className="section-card">
           <div className="section-head">
-            <span className="section-title">Invite someone</span>
+            <span className="section-title">Add team member</span>
           </div>
           <div style={{ padding: '20px 24px' }}>
             {inviteError && (
@@ -210,8 +219,28 @@ export default function Settings() {
               </div>
             )}
             {inviteSuccess && (
-              <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 13, color: '#15803D', marginBottom: 14 }}>
-                {inviteSuccess}
+              <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 'var(--radius)', padding: '12px 14px', fontSize: 13, color: '#15803D', marginBottom: 14 }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                  ✓ {inviteSuccess} has been added.
+                </div>
+                <div style={{ color: '#166534', marginBottom: 10 }}>
+                  No email was sent. Share the link below and they can sign in with their BDG Google account.
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <code style={{
+                    background: '#DCFCE7', border: '1px solid #BBF7D0',
+                    borderRadius: 6, padding: '4px 10px', fontSize: 12,
+                    color: '#15803D', flex: 1, overflow: 'hidden',
+                    textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>{APP_URL}</code>
+                  <button
+                    className="btn btn-sm"
+                    onClick={copyUrl}
+                    style={{ flexShrink: 0 }}
+                  >
+                    {copied ? '✓ Copied' : 'Copy link'}
+                  </button>
+                </div>
               </div>
             )}
             <div className="form-grid">
@@ -220,7 +249,7 @@ export default function Settings() {
                 <input
                   className="form-input"
                   type="email"
-                  placeholder="colleague@company.com"
+                  placeholder="colleague@bustle.com"
                   value={inviteEmail}
                   onChange={e => setInviteEmail(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleInvite()}
@@ -240,9 +269,9 @@ export default function Settings() {
               <label className="form-label">Role</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {[
-                  { value: 'admin',          label: 'Admin',           desc: '— full access, can invite others' },
-                  { value: 'member',         label: 'Member',          desc: '— full access, cannot manage team' },
-                  { value: 'hiring_manager', label: 'Hiring Manager',  desc: '— sees only their assigned job and its candidates' },
+                  { value: 'admin',          label: 'Admin',          desc: '— full access, can add team members' },
+                  { value: 'member',         label: 'Member',         desc: '— full access, cannot manage team' },
+                  { value: 'hiring_manager', label: 'Hiring Manager', desc: '— sees only their assigned job and its candidates' },
                 ].map(r => (
                   <label key={r.value} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
                     <input
@@ -264,11 +293,11 @@ export default function Settings() {
                 onClick={handleInvite}
                 disabled={inviting || !inviteEmail.trim()}
               >
-                {inviting ? 'Sending invite…' : 'Send invite'}
+                {inviting ? 'Adding…' : 'Add to HireME'}
               </button>
             </div>
             <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)' }}>
-              They'll receive an email with a link to set their password and access the ATS.
+              No email will be sent. After adding, share the app link and they sign in with their BDG Google account.
             </div>
           </div>
         </div>
