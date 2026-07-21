@@ -56,6 +56,7 @@ export function AppProvider({ children, user }) {
   const [team, setTeam] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
+  const [unauthorized, setUnauthorized] = useState(false)
 
   // ── Initial load ─────────────────────────────────────────────
   const loadAll = useCallback(async () => {
@@ -82,17 +83,13 @@ export function AppProvider({ children, user }) {
 
     const myProfile = (teamData || []).find(p => p.id === user.id)
     if (!myProfile) {
-      await supabase.from('profiles').upsert({
-        id: user.id,
-        email: user.email,
-        full_name: user.user_metadata?.full_name || '',
-        role: 'admin',
-      }, { onConflict: 'id' })
-      const { data: refreshed } = await supabase.from('profiles').select('*').order('created_at', { ascending: true })
-      setTeam(refreshed || [])
-    } else {
-      setTeam(teamData || [])
+      // User signed in with Google but hasn't been added to HireME — block access.
+      setUnauthorized(true)
+      setLoading(false)
+      return
     }
+
+    setTeam(teamData || [])
 
     const enriched = (candidatesData || []).map(c => ({
       ...c,
@@ -100,8 +97,7 @@ export function AppProvider({ children, user }) {
       notes: (notesData || []).filter(n => n.candidate_id === c.id),
     }))
 
-    const resolvedProfile = (teamData || []).find(p => p.id === user.id) || (myProfile ? null : { role: 'admin' })
-    const isHM = resolvedProfile?.role === 'hiring_manager'
+    const isHM = myProfile.role === 'hiring_manager'
 
     let filteredJobs = jobsData || []
     let filteredCandidates = enriched
@@ -441,7 +437,7 @@ export function AppProvider({ children, user }) {
 
   const activeJobs = jobs.filter(j => j.status === 'Active')
   const myProfile = team.find(m => m.id === user.id)
-  const isAdmin = !myProfile || myProfile.role === 'admin'
+  const isAdmin = myProfile?.role === 'admin'
   const isHiringManager = myProfile?.role === 'hiring_manager'
 
   const duplicates = (() => {
@@ -486,7 +482,7 @@ export function AppProvider({ children, user }) {
 
   return (
     <AppContext.Provider value={{
-      candidates, jobs, interviews, offers, notes, offerTemplates, team, loading,
+      candidates, jobs, interviews, offers, notes, offerTemplates, team, loading, unauthorized,
       activeJobs, activeCandidates, pendingOffers,
       isAdmin, isHiringManager,
       duplicates, mergeCandidates,
